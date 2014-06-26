@@ -1,9 +1,11 @@
 /* 6809 Simulator V09,
-   By L.C. Benschop, Eidnhoven The Netherlands.
-   This program is in the public domain.
-   
+
+   created 1994 by L.C. Benschop.
+   copyleft (c) 1994-2014 by the sbc09 team, see AUTHORS for more details.
+   license: GNU General Public License version 2, see LICENSE for more details.
+
    This program simulates a 6809 processor.
-   
+
    System dependencies: short must be 16 bits.
                         char  must be 8 bits.
                         long must be more than 16 bits.
@@ -11,43 +13,35 @@
                         machine must be twos complement.
    Most Unix machines will work. For MSODS you need long pointers
    and you may have to malloc() the mem array of 65536 bytes.
-                 
-   Define CPU_BIG_ENDIAN with != 0 if you have a big-endian machine (680x0 etc)              
+
+   Define CPU_BIG_ENDIAN with != 0 if you have a big-endian machine (680x0 etc)
    Usually UNIX systems get this automatically from BIG_ENDIAN and BYTE_ORDER
    definitions ...
-   
+
    Define TRACE if you want an instruction trace on stderr.
    Define TERM_CONTROL if you want nonblocking non-echoing key input.
-   * THIS IS DIRTY !!! *                 
-                 
-   Special instructions:                     
+   * THIS IS DIRTY !!! *
+
+   Special instructions:
    SWI2 writes char to stdout from register B.
    SWI3 reads char from stdout to register B, sets carry at EOF.
                (or when no key available when using term control).
-   SWI retains its normal function. 
+   SWI retains its normal function.
    CWAI and SYNC stop simulator.
-   
-   The program reads a binary image file at $100 and runs it from there.
-   The file name must be given on the command line.                                              
 
-   Revisions:
-	2012-06-05 johann AT klasek at
-		Fixed: com with C "NOT" operator ... 0^(value) did not work!
-	2012-06-06
-		Fixed: changes from 1994 release (flag handling)
-			reestablished.
-	2012-07-15 JK
-		New: option parsing, new option -d (dump memory on exit)
+   The program reads a binary image file at $100 and runs it from there.
+   The file name must be given on the command line.
+
 	2013-10-07 JK
 		New: print ccreg with flag name in lower/upper case depending on flag state.
 	2013-10-20 JK
 		New: Show instruction disassembling in trace mode.
 
-*/   
+*/
 
 #include <stdio.h>
 #ifdef TERM_CONTROL
-#include <fcntl.h> 
+#include <fcntl.h>
 int tflags;
 #endif
 #include <stdlib.h>
@@ -91,7 +85,7 @@ Word *dreg=(Word *)d_reg;
 #if CPU_BIG_ENDIAN
  Byte *areg=d_reg;
  Byte *breg=d_reg+1;
-#else  
+#else
  Byte *breg=d_reg;
  Byte *areg=d_reg+1;
 #endif
@@ -104,7 +98,7 @@ static Byte mem[65536];
 #define SETWORD(a,n) {mem[a]=(n)>>8;mem[(a)+1]=n;}
 /* Two bytes of a word are fetched separately because of
    the possible wrap-around at address $ffff and alignment
-*/   
+*/
 
 
 int iflag; /* flag to indicate prebyte $10 or $11 */
@@ -243,7 +237,7 @@ Word plusnn()
  da_ops(off,dixreg[idx],4);
  return(*ixregs[idx])+w;
 }
- 
+
 Word plusd()
 {
  da_ops("d,",dixreg[idx],4);
@@ -263,7 +257,7 @@ Word npcr()
 }
 
 Word nnpcr()
-{ 
+{
  Word w;
  char off[11];
 
@@ -271,7 +265,7 @@ Word nnpcr()
  sprintf(off,"$%04x,pcr",pcreg+w);
  da_ops(off,NULL,5);
  return pcreg+w;
-}            
+}
 
 Word direct()
 {
@@ -285,7 +279,7 @@ Word direct()
 }
 
 Word zeropage()
-{ 
+{
  Byte b;
  char off[6];
 
@@ -317,12 +311,12 @@ Word immediate2()
  return temp;
 }
 
-Word (*pbtable[])()={ ainc, ainc2, adec, adec2, 
+Word (*pbtable[])()={ ainc, ainc2, adec, adec2,
                       plus0, plusb, plusa, illaddr,
                       plusn, plusnn, illaddr, plusd,
                       npcr, nnpcr, illaddr, direct, };
 
-Word postbyte() 
+Word postbyte()
 {
  Byte pb;
  Word temp;
@@ -331,7 +325,7 @@ Word postbyte()
  IMMBYTE(pb)
  idx=((pb & 0x60) >> 5);
  if(pb & 0x80) {
-  if( pb & 0x10) 
+  if( pb & 0x10)
 	da_ops("[",NULL,3);
   temp=(*pbtable[pb & 0x0f])();
   if( pb & 0x10) {
@@ -344,7 +338,7 @@ Word postbyte()
   if(temp & 0x10) temp|=0xfff0; /* sign extend */
   sprintf(off,"%d,",(temp & 0x10) ? -(temp ^ 0xffff)-1 : temp);
   da_ops(off,dixreg[idx],1);
-  return (*ixregs[idx])+temp; 
+  return (*ixregs[idx])+temp;
  }
 }
 
@@ -354,13 +348,13 @@ Byte * eaddr0() /* effective address for NEG..JMP as byte pointer */
  {
   case 0: return mem+zeropage();
   case 1:case 2:case 3: return 0; /*canthappen*/
- 
+
   case 4: da_inst_cat("a",-2); return areg;
   case 5: da_inst_cat("b",-2); return breg;
   case 6: da_inst_cat(NULL,2); return mem+postbyte();
-  case 7: return mem+direct(); 
+  case 7: return mem+direct();
  }
-} 
+}
 
 Word eaddr8()  /* effective address for 8-bits ops. */
 {
@@ -383,8 +377,8 @@ Word eaddr16() /* effective address for 16-bits ops. */
   case 3: da_inst_cat(NULL,-1); return direct();
  }
 }
-  
-ill() /* illegal opcode==noop */ 
+
+ill() /* illegal opcode==noop */
 {
 }
 
@@ -406,8 +400,8 @@ ill() /* illegal opcode==noop */
 
 #define SETSTATUS(a,b,res) if((a^b^res)&0x10) SEH else CLH \
                            if((a^b^res^(res>>1))&0x80)SEV else CLV \
-                           if(res&0x100)SEC else CLC SETNZ8((Byte)res) 
-                           
+                           if(res&0x100)SEC else CLC SETNZ8((Byte)res)
+
 add()
 {
  Word aop,bop,res;
@@ -415,11 +409,11 @@ add()
  da_inst("add",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop+bop;
  SETSTATUS(aop,bop,res)
  *aaop=res;
-} 
+}
 
 sbc()
 {
@@ -428,11 +422,11 @@ sbc()
  da_inst("sbc",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop-bop-(ccreg&0x01);
  SETSTATUS(aop,bop,res)
  *aaop=res;
-} 
+}
 
 sub()
 {
@@ -441,11 +435,11 @@ sub()
  da_inst("sub",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop-bop;
  SETSTATUS(aop,bop,res)
  *aaop=res;
-} 
+}
 
 adc()
 {
@@ -454,11 +448,11 @@ adc()
  da_inst("adc",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop+bop+(ccreg&0x01);
  SETSTATUS(aop,bop,res)
  *aaop=res;
-} 
+}
 
 cmp()
 {
@@ -467,10 +461,10 @@ cmp()
  da_inst("cmp",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop-bop;
  SETSTATUS(aop,bop,res)
-} 
+}
 
 and()
 {
@@ -479,12 +473,12 @@ and()
  da_inst("and",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop&bop;
  SETNZ8(res)
  CLV
  *aaop=res;
-} 
+}
 
 or()
 {
@@ -493,12 +487,12 @@ or()
  da_inst("or",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop|bop;
  SETNZ8(res)
  CLV
  *aaop=res;
-} 
+}
 
 eor()
 {
@@ -507,12 +501,12 @@ eor()
  da_inst("eor",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop^bop;
  SETNZ8(res)
  CLV
  *aaop=res;
-} 
+}
 
 bit()
 {
@@ -521,11 +515,11 @@ bit()
  da_inst("bit",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  aop=*aaop;
- bop=mem[eaddr8()];                           
+ bop=mem[eaddr8()];
  res=aop&bop;
  SETNZ8(res)
  CLV
-} 
+}
 
 ld()
 {
@@ -533,11 +527,11 @@ ld()
  Byte* aaop;
  da_inst("ld",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
- res=mem[eaddr8()];                           
+ res=mem[eaddr8()];
  SETNZ8(res)
  CLV
  *aaop=res;
-} 
+}
 
 st()
 {
@@ -546,10 +540,10 @@ st()
  da_inst("st",(ireg&0x40)?"b":"a",2);
  aaop=(ireg&0x40)?breg:areg;
  res=*aaop;
- mem[eaddr8()]=res;                           
+ mem[eaddr8()]=res;
  SETNZ8(res)
  CLV
-} 
+}
 
 jsr()
 {
@@ -571,7 +565,7 @@ bsr()
  da_inst("bsr",NULL,7);
  da_len = 2;
  PUSHWORD(pcreg)
- pcreg+=SIGNED(b); 
+ pcreg+=SIGNED(b);
 }
 
 neg()
@@ -662,7 +656,7 @@ asl()
  ea=eaddr0();
  a=*ea;
  r=a<<1;
- SETSTATUS(a,a,r) 
+ SETSTATUS(a,a,r)
  *ea=r;
 }
 
@@ -675,9 +669,9 @@ rol()
  da_inst("rol",NULL,4);
  ea=eaddr0();
  r=*ea;
- if(r&0x80)SEC else CLC 
+ if(r&0x80)SEC else CLC
  if((r&0x80)^((r<<1)&0x80))SEV else CLV
- r=(r<<1)+c; 
+ r=(r<<1)+c;
  SETNZ8(r)
  *ea=r;
 }
@@ -749,7 +743,7 @@ flag0()
  if(iflag) /* in case flag already set by previous flag instr don't recurse */
  {
   pcreg--;
-  return; 
+  return;
  }
  iflag=1;
  ireg=mem[pcreg++];
@@ -763,7 +757,7 @@ flag1()
  if(iflag) /* in case flag already set by previous flag instr don't recurse */
  {
   pcreg--;
-  return; 
+  return;
  }
  iflag=2;
  ireg=mem[pcreg++];
@@ -829,7 +823,7 @@ daa()
 
 orcc()
 {
- Byte b; 
+ Byte b;
  char off[7];
  IMMBYTE(b)
  sprintf(off,"#$%02x", b);
@@ -840,13 +834,13 @@ orcc()
 
 andcc()
 {
- Byte b; 
+ Byte b;
  char off[6];
  IMMBYTE(b)
  sprintf(off,"#$%02x", b);
  da_inst("andcc",NULL,3);
  da_ops(off,NULL,0);
- 
+
  ccreg&=b;
 }
 
@@ -897,7 +891,7 @@ rti()
   PULLWORD(xreg)
   PULLWORD(yreg)
   PULLWORD(ureg)
- } 
+ }
  PULLWORD(pcreg)
 }
 
@@ -907,7 +901,7 @@ swi()
  da_inst("swi",(iflag==1)?"2":(iflag==2)?"3":"",5);
  switch(iflag)
  {
-  case 0: 
+  case 0:
    PUSHWORD(pcreg)
    PUSHWORD(ureg)
    PUSHWORD(yreg)
@@ -929,7 +923,7 @@ swi()
    *breg=w;
  }
 }
-    
+
 
 Word *wordregs[]={(Word*)d_reg,&xreg,&yreg,&ureg,&sreg,&pcreg,&sreg,&pcreg};
 
@@ -944,7 +938,7 @@ tfr()
  Byte b;
  da_inst("tfr",NULL,7);
  IMMBYTE(b)
- if(b&0x80) { 
+ if(b&0x80) {
   *byteregs[b&0x03]=*byteregs[(b&0x30)>>4];
  } else {
   *wordregs[b&0x07]=*wordregs[(b&0x70)>>4];
@@ -958,16 +952,16 @@ exg()
  da_inst("tfr",NULL,8);
  IMMBYTE(b)
  if(b&0x80) {
-  w=*byteregs[b&0x03]; 
+  w=*byteregs[b&0x03];
   *byteregs[b&0x03]=*byteregs[(b&0x30)>>4];
   *byteregs[(b&0x30)>>4]=w;
  } else {
   w=*wordregs[b&0x07];
   *wordregs[b&0x07]=*wordregs[(b&0x70)>>4];
   *wordregs[(b&0x70)>>4]=w;
- } 
+ }
 }
-  
+
 br(int f)
 {
  Byte b;
@@ -977,8 +971,8 @@ br(int f)
 
  if(!iflag) {
   IMMBYTE(b)
-  dest = pcreg+SIGNED(b);   
-  if(f) pcreg+=SIGNED(b);   
+  dest = pcreg+SIGNED(b);
+  if(f) pcreg+=SIGNED(b);
   da_len = 2;
  } else {
   IMMWORD(w)
@@ -988,12 +982,12 @@ br(int f)
  }
  sprintf(off,"$%04x", dest&0xffff);
  da_ops(off,NULL,0);
-}   
+}
 
 #define NXORV  ((ccreg&0x08)^(ccreg&0x02))
 
 bra()
-{ 
+{
  da_inst(iflag?"l":"","bra",iflag?5:3);
  br(1);
 }
@@ -1014,7 +1008,7 @@ bls()
 {
  da_inst(iflag?"l":"","bls",iflag?5:3);
  br(ccreg&0x05);
-} 
+}
 
 bcc()
 {
@@ -1074,7 +1068,7 @@ blt()
 {
  da_inst(iflag?"l":"","blt",iflag?5:3);
  br(NXORV);
-} 
+}
 
 bgt()
 {
@@ -1086,7 +1080,7 @@ ble()
 {
  da_inst(iflag?"l":"","ble",iflag?5:3);
  br(NXORV||ccreg&0x04);
-}   
+}
 
 leax()
 {
@@ -1217,7 +1211,7 @@ addd()
  bop=GETWORD(ea);
  res=aop+bop;
  SETSTATUSD(aop,bop,res)
- *dreg=res; 
+ *dreg=res;
 }
 
 subd()
@@ -1231,9 +1225,9 @@ subd()
  bop=GETWORD(ea);
  res=aop-bop;
  SETSTATUSD(aop,bop,res)
- if(iflag==0) *dreg=res; 
+ if(iflag==0) *dreg=res;
 }
- 
+
 cmpx()
 {
  unsigned long aop,bop,res;
@@ -1383,7 +1377,7 @@ char *to_bin(Byte b)
 	char *ccbit="EFHINZVC";
 	int i;
 
-	for(bm=0x80, i=0; bm>0; bm >>=1, i++) 
+	for(bm=0x80, i=0; bm>0; bm >>=1, i++)
 		binstr[i] = (b & bm) ? toupper(ccbit[i]) : tolower(ccbit[i]);
 	binstr[8] = 0;
 	return binstr;
@@ -1403,22 +1397,22 @@ void cr() {
 /* max. bytes of instruction code per trace line */
 #define I_MAX 4
 
-void trace() 
+void trace()
 {
    int ilen;
    int i;
 
   if (
-   1 ||						/* no trace filtering ... */ 
+   1 ||						/* no trace filtering ... */
    !(ureg > 0x09c0 && ureg < 0x09f3) && (	/* CMOVE ausblenden! */
     pcreg_prev == 0x01de || /* DOLST */
     pcreg_prev == 0x037a || /* FDOVAR */
   /*
-    ureg >= 0x0300 && ureg < 0x03f0 || 
-    ureg >=0x1900 || 
-    ureg > 0x118b && ureg < 0x11b2 || 
+    ureg >= 0x0300 && ureg < 0x03f0 ||
+    ureg >=0x1900 ||
+    ureg > 0x118b && ureg < 0x11b2 ||
     pcreg_prev >= 0x01de && pcreg_prev < 0x0300 ||
-    xreg >=0x8000 || 
+    xreg >=0x8000 ||
     pcreg_prev >= 0x01de && pcreg_prev < 0x0300 ||
    */
     0
@@ -1439,7 +1433,7 @@ void trace()
    // fprintf(stderr,"%02x ",mem[pcreg]);else fprintf(stderr,"   ");
    fprintf(stderr,"x=%04x y=%04x u=%04x s=%04x a=%02x b=%02x cc=%s",
                    xreg,yreg,ureg,sreg,*areg,*breg,to_bin(ccreg));
-   fprintf(stderr,", s: %04x %04x, r: %04x", 
+   fprintf(stderr,", s: %04x %04x, r: %04x",
 	mem[sreg]<<8|mem[sreg+1],
 	mem[sreg+2]<<8|mem[sreg+3],
 	mem[yreg]<<8|mem[yreg+1]
@@ -1491,7 +1485,7 @@ main(int argc,char *argv[])
  /* raw disables SIGINT, brkint reenables it ...
   */
 #if defined(TERM_CONTROL) && ! defined(TRACE)
-  /* raw, but still allow key signaling, especial if ^C is desired 
+  /* raw, but still allow key signaling, especial if ^C is desired
      - if not, remove brkint and isig!
    */
   system("stty -echo nl raw brkint isig");
@@ -1501,7 +1495,7 @@ main(int argc,char *argv[])
 
 #ifdef TRACE
  da_len = 0;
-#endif 
+#endif
  cycles_sum = 0;
  pcreg_prev = pcreg;
 
@@ -1514,16 +1508,16 @@ main(int argc,char *argv[])
 
 #ifdef TRACE
   trace();
-#endif 
- 
+#endif
+
  pcreg_prev = pcreg;
-   
- } /* for */ 
+
+ } /* for */
 }
 
 
 
-void finish() 
+void finish()
 {
  cr();
  fprintf(stderr,"Cycles: %lu", cycles_sum);

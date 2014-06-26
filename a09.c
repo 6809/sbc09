@@ -1,35 +1,37 @@
-/* A09, 6809 Assembler. 
-   
-   (C) Copyright 1993, L.C. Benschop. 
+/* A09, 6809 Assembler.
+
+   created 1993,1994 by L.C. Benschop.
+   copyleft (c) 1994-2014 by the sbc09 team, see AUTHORS for more details.
+   license: GNU General Public License version 2, see LICENSE for more details.
 
    Generates binary image file from the lowest to
    the highest address with actually assembled data.
-   
+
    Machine dependencies:
                   char is 8 bits.
                   short is 16 bits.
                   integer arithmetic is twos complement.
-   
+
    syntax a09 [-o filename] [-l filename] sourcefile.
-                  
+
    Options
-   -o filename name of the output file (default name minus a09 suffix) 
+   -o filename name of the output file (default name minus a09 suffix)
    -l filename list file name (default no listing)
    -d enable debugging
-   
+
    recognized pseudoops:
     extern public
-    macro endm if else endif 
+    macro endm if else endif
     org equ set setdp
-    fcb fcw fdb fcc rmb  
-    end include title   
+    fcb fcw fdb fcc rmb
+    end include title
 
    Revisions:
 	2012-06-04 j at klasek at
 		Fixed: parsing register indexed modes/operands
 		New: debugging parameter/option.
 	2012-06-18 j at klasek at
-		Fixed: pshu opcode 
+		Fixed: pshu opcode
 	2012-06-22 j at klasek at
 		Fixed: backported:
 			doaddress() opcode and offset handling from 1994 version
@@ -49,9 +51,9 @@
 
 static int debug=0;
 
-struct oprecord{char * name; 
-                unsigned char cat; 
-                unsigned short code;};    
+struct oprecord{char * name;
+                unsigned char cat;
+                unsigned short code;};
 
 /* Instruction categories:
    0 one byte oprcodes   NOP
@@ -59,7 +61,7 @@ struct oprecord{char * name;
    2 opcodes w. imm byte ANDCC
    3 LEAX etc.
    4 short branches. BGE
-   5 long branches 2byte opc LBGE 
+   5 long branches 2byte opc LBGE
    6 long branches 1byte opc LBRA
    7 accumulator instr.      ADDA
    8 double reg instr 1byte opc LDX
@@ -69,7 +71,7 @@ struct oprecord{char * name;
    12 push,pull
    13 pseudoops
 */
- 
+
 struct oprecord optable[]={
   {"ABX",0,0x3a},{"ADCA",7,0x89},{"ADCB",7,0xc9},
   {"ADDA",7,0x8b},{"ADDB",7,0xcb},{"ADDD",8,0xc3},
@@ -146,7 +148,7 @@ struct symrecord{char name[MAXIDLEN+1];
                  char cat;
                  unsigned short value;
                 };
-                
+
 int symcounter=0;
 
 /* Symbol categories.
@@ -165,9 +167,9 @@ int symcounter=0;
   12 local label.
   13 empty.
 */
-  
-struct symrecord symtable[NLABELS];                   
-  
+
+struct symrecord symtable[NLABELS];
+
 struct oprecord * findop(char * nm)
 /* Find operation (mnemonic) in table using binary search */
 {
@@ -179,13 +181,13 @@ struct oprecord * findop(char * nm)
   if(s<0) lo=i+1;
   else if(s>0) hi=i-1;
   else break;
- } while(hi>=lo);     
+ } while(hi>=lo);
  if (s) return NULL;
  return optable+i;
-}  
+}
 
 struct symrecord * findsym(char * nm)
-/* finds symbol table record; inserts if not found 
+/* finds symbol table record; inserts if not found
    uses binary search, maintains sorted table */
 {
  int lo,hi,i,j,s;
@@ -203,14 +205,14 @@ struct symrecord * findsym(char * nm)
   if(symcounter==NLABELS) {
    fprintf(stderr,"Sorry, no storage for symbols!!!");
    exit(4);
-  } 
+  }
   for(j=symcounter;j>i;j--) symtable[j]=symtable[j-1];
   symcounter++;
   strcpy(symtable[i].name,nm);
   symtable[i].cat=13;
- }    
+ }
  return symtable+i;
-}  
+}
 
 FILE *listfile,*objfile;
 char listname[FNLEN+1],objname[FNLEN+1],srcname[FNLEN+1],curname[FNLEN+1];
@@ -220,15 +222,15 @@ outsymtable()
 {
  int i,j=0;
  fprintf(listfile,"\nSYMBOL TABLE");
- for(i=0;i<symcounter;i++) 
+ for(i=0;i<symcounter;i++)
  if(symtable[i].cat!=13) {
   if(j%4==0)fprintf(listfile,"\n");
   fprintf(listfile,"%10s %02d %04x",symtable[i].name,symtable[i].cat,
-                       symtable[i].value); 
+                       symtable[i].value);
   j++;
  }
  fprintf(listfile,"\n");
-} 
+}
 
 struct regrecord{char *name;unsigned char tfr,psh;};
 struct regrecord regtable[]=
@@ -243,31 +245,31 @@ struct regrecord * findreg(char *nm)
  for(i=0;i<12;i++) {
   if(strcmp(regtable[i].name,nm)==0) return regtable+i;
  }
- return 0;                   
+ return 0;
 }
 
 
 char pass;             /* Assembler pass=1 or 2 */
 char listing;          /* flag to indicate listing */
-char relocatable;      /* flag to indicate relocatable object. */  
-char terminate;        /* flag to indicate termination. */ 
+char relocatable;      /* flag to indicate relocatable object. */
+char terminate;        /* flag to indicate termination. */
 char generating;       /* flag to indicate that we generate code */
 unsigned short loccounter,oldlc;  /* Location counter */
 
 char inpline[128];     /* Current input line (not expanded)*/
-char srcline[128];     /* Current source line */ 
+char srcline[128];     /* Current source line */
 char * srcptr;         /* Pointer to line being parsed */
 
 char unknown;          /* flag to indicate value unknown */
 char certain;          /* flag to indicate value is certain at pass 1*/
 int error;             /* flags indicating errors in current line. */
 int errors;            /* number of errors */
-char exprcat;          /* category of expression being parsed, eg. 
+char exprcat;          /* category of expression being parsed, eg.
                           label or constant, this is important when
                           generating relocatable object code. */
 
- 
-char namebuf[MAXIDLEN+1]; 
+
+char namebuf[MAXIDLEN+1];
 
 scanname()
 {
@@ -280,7 +282,7 @@ scanname()
    if(i<MAXIDLEN)namebuf[i++]=c;
  }
  namebuf[i]=0;
- srcptr--;  
+ srcptr--;
 }
 
 skipspace()
@@ -290,7 +292,7 @@ skipspace()
   c=*srcptr++;
  } while(c==' '||c=='\t');
  srcptr--;
-} 
+}
 
 short scanexpr(int);
 
@@ -305,7 +307,7 @@ short scandecimal()
  }
  srcptr--;
  return t;
-} 
+}
 
 short scanhex()
 {
@@ -316,7 +318,7 @@ short scanhex()
   t=t*16+namebuf[i]-'0';
   if(namebuf[i]>'9')t-=7;
   i++;
- }  
+ }
  if(i==0)error|=1;
  return t;
 }
@@ -376,20 +378,20 @@ short scanlabel()
      && (unsigned short)(p->value)>(unsigned short)loccounter)||
      exprcat==4)
    certain=0;
- if(exprcat==8||exprcat==6||exprcat==10)exprcat=2;   
+ if(exprcat==8||exprcat==6||exprcat==10)exprcat=2;
  return p->value;
 }
- 
+
 /* expression categories...
    all zeros is ordinary constant.
    bit 1 indicates address within module.
    bit 2 indicates external address.
    bit 4 indicates this can't be relocated if it's an address.
    bit 5 indicates address (if any) is negative.
-*/ 
- 
- 
- 
+*/
+
+
+
 short scanfactor()
 {
  char c;
@@ -406,11 +408,11 @@ short scanfactor()
   case '\'' : return scanchar();
   case '(' : srcptr++;t=scanexpr(0);skipspace();
              if(*srcptr==')')srcptr++;else error|=1;
-             return t; 
+             return t;
   case '-' : srcptr++;exprcat^=32;return -scanfactor();
   case '+' : srcptr++;return scanfactor();
   case '!' : srcptr++;exprcat|=16;return !scanfactor();
-  case '~' : srcptr++;exprcat|=16;return ~scanfactor();           
+  case '~' : srcptr++;exprcat|=16;return ~scanfactor();
  }
  error|=1;
  return 0;
@@ -425,8 +427,8 @@ short scanfactor()
              oldcat=0;}\
            exprcat|=oldcat;\
 /* resolve such cases as constant added to address or difference between
-   two addresses in same module */           
- 
+   two addresses in same module */
+
 
 short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
 {
@@ -437,7 +439,7 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
  t=scanexpr(level+1);
  while(1) {
   skipspace();
-  c=*srcptr++; 
+  c=*srcptr++;
   switch(c) {
   case '*':oldcat=exprcat;
            t*=scanexpr(10);
@@ -458,7 +460,7 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
            t+=scanexpr(9);
            RESOLVECAT
            break;
-  case '-':if(level==9)EXITEVAL              
+  case '-':if(level==9)EXITEVAL
            oldcat=exprcat;
            t-=scanexpr(9);
            exprcat^=32;
@@ -470,7 +472,7 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
             oldcat=exprcat;
             t<<=scanexpr(8);
             exprcat|=oldcat|16;
-            break; 
+            break;
            } else if(*(srcptr)=='=') {
             if(level>=7)EXITEVAL
             srcptr++;
@@ -491,7 +493,7 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
             oldcat=exprcat;
             t>>=scanexpr(8);
             exprcat|=oldcat|16;
-            break; 
+            break;
            } else if(*(srcptr)=='=') {
             if(level>=7)EXITEVAL
             srcptr++;
@@ -511,7 +513,7 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
            oldcat=exprcat;
            t=t!=scanexpr(6);
            exprcat|=oldcat|16;
-           break;             
+           break;
   case '=':if(level>=6)EXITEVAL
            if(*srcptr=='=')srcptr++;
            oldcat=exprcat;
@@ -522,7 +524,7 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
            oldcat=exprcat;
            t&=scanexpr(5);
            exprcat|=oldcat|16;
-           break;             
+           break;
   case '^':if(level>=4)EXITEVAL
            oldcat=exprcat;
            t^=scanexpr(4);
@@ -531,8 +533,8 @@ short scanexpr(int level) /* This is what you call _recursive_ descent!!!*/
   case '|':if(level>=3)EXITEVAL
            oldcat=exprcat;
            t|=scanexpr(3);
-           exprcat|=oldcat|16;                                        
-  default: EXITEVAL        
+           exprcat|=oldcat|16;
+  default: EXITEVAL
   }
  }
 }
@@ -558,7 +560,7 @@ int scanindexreg()
   case 'U':postbyte|=0x40;return 1;
   case 'S':postbyte|=0x60;return 1;
   default: return 0;
- }  
+ }
 }
 
 set3()
@@ -576,7 +578,7 @@ scanspecial()
    srcptr++;
    postbyte=0x83;
   } else postbyte=0x82;
-  if(!scanindexreg())error|=2;else srcptr++; 
+  if(!scanindexreg())error|=2;else srcptr++;
  } else {
   postbyte=0x80;
   if(!scanindexreg())error|=2;else srcptr++;
@@ -585,9 +587,9 @@ scanspecial()
    if(*srcptr=='+') {
     srcptr++;
     postbyte+=1;
-   }  
+   }
   } else postbyte+=4;
- }    
+ }
 }
 
 scanindexed()
@@ -604,7 +606,7 @@ scanindexed()
    case 1:postbyte+=(operand&31);opsize=0;break;
    case 2:postbyte+=0x88;break;
    case 3:postbyte+=0x89;break;
-   }                 
+   }
  } else { /*pc relative*/
   if(toupper(*srcptr)!='P')error|=2;
   else {
@@ -613,11 +615,11 @@ scanindexed()
     else {
      srcptr++;
      if(toupper(*srcptr)=='R')srcptr++;
-    } 
-  }    
+    }
+  }
   mode++;postbyte+=0x8c;
   if(opsize==0)if(unknown||!certain)opsize=3;else opsize=2;
-  if(opsize==1)opsize=2;    
+  if(opsize==1)opsize=2;
  }
 }
 
@@ -649,7 +651,7 @@ scanoperands()
      if(!scanindexreg())RESTORE else set3();
      srcptr++;
   }
-  break;    
+  break;
  case 'A': case 'a':
   oldsrcptr=srcptr;
   srcptr++;
@@ -659,10 +661,10 @@ scanoperands()
      srcptr++;
      if(!scanindexreg())RESTORE else set3();
      srcptr++;
-  } 
+  }
   break;
- case 'B': case 'b': 
-  oldsrcptr=srcptr; 
+ case 'B': case 'b':
+  oldsrcptr=srcptr;
   srcptr++;
   skipspace();
   if(*srcptr!=',')RESTORE else {
@@ -673,15 +675,15 @@ scanoperands()
      srcptr++;
      if (debug) fprintf(stderr,"DEBUG: scanoperands: breg: postindex c=%c (%02X)\n",*srcptr,*srcptr);
   }
-  break;   
+  break;
  case ',':
   srcptr++;
   scanspecial();
-  break; 
+  break;
  case '#':
   if(mode==5)error|=2;else mode=0;
   srcptr++;
-  operand=scanexpr(0); 
+  operand=scanexpr(0);
   break;
  case '<':
   srcptr++;
@@ -689,7 +691,7 @@ scanoperands()
    srcptr++;
    opsize=1;
   } else opsize=2;
-  goto dodefault;    
+  goto dodefault;
  case '>':
   srcptr++;
   opsize=3;
@@ -704,21 +706,21 @@ scanoperands()
     if(unknown||!certain||dpsetting==-1||
          (unsigned short)(operand-dpsetting*256)>=256)
     opsize=3; else opsize=2;
-   }  
-   if(opsize==1)opsize=2;         
+   }
+   if(opsize==1)opsize=2;
    if(mode==5){
     postbyte=0x8f;
     opsize=3;
    } else mode=opsize-1;
-  }   
+  }
  }
  if (debug) fprintf(stderr,"DEBUG: scanoperands: mode=%d, error=%d, postbyte=%02X\n",mode,error,postbyte);
  if(mode>=5) {
   skipspace();
   postbyte|=0x10;
-  if(*srcptr!=']')error|=2;else srcptr++;    
+  if(*srcptr!=']')error|=2;else srcptr++;
  }
- if(pass==2&&unknown)error|=4; 
+ if(pass==2&&unknown)error|=4;
 }
 
 unsigned char codebuf[128];
@@ -751,7 +753,7 @@ report()
   error>>=1;
  }
  errors++;
-} 
+}
 
 outlist()
 {
@@ -761,7 +763,7 @@ outlist()
   fprintf(listfile,"%02X",codebuf[i]);
  for(;i<=MAXLISTBYTES;i++)
   fprintf(listfile,"  ");
- fprintf(listfile,"%s\n",srcline); 
+ fprintf(listfile,"%s\n",srcline);
 }
 
 setlabel(struct symrecord * lp)
@@ -773,8 +775,8 @@ setlabel(struct symrecord * lp)
   } else {
    lp->cat=2;
    lp->value=loccounter;
-  } 
- } 
+  }
+ }
 }
 
 putbyte(unsigned char b)
@@ -792,13 +794,13 @@ doaddress() /* assemble the right addressing bytes for an instruction */
 {
  int offs;
  switch(mode) {
- case 0: if(opsize==2)putbyte(operand);else putword(operand);break; 
+ case 0: if(opsize==2)putbyte(operand);else putword(operand);break;
  case 1: putbyte(operand);break;
  case 2: putword(operand);break;
  case 3: case 5: putbyte(postbyte);
     switch(opsize) {
      case 2: putbyte(operand);break;
-     case 3: putword(operand); 
+     case 3: putword(operand);
     }
     break;
  case 4: case 6: offs=(unsigned short)operand-loccounter-codeptr-2;
@@ -808,9 +810,9 @@ doaddress() /* assemble the right addressing bytes for an instruction */
                  postbyte++;
                 }
                 putbyte(postbyte);
-                if(opsize==3)putword(offs); 
-                else putbyte(offs);   
- }     
+                if(opsize==3)putword(offs);
+                else putbyte(offs);
+ }
 }
 
 onebyte(int co)
@@ -946,9 +948,9 @@ pshpul(int co)
  do {
   if(*srcptr==',')srcptr++;
   skipspace();
-  scanname(); 
+  scanname();
   if((p=findreg(namebuf))==0)error|=2;
-  else postbyte|=p->psh; 
+  else postbyte|=p->psh;
   skipspace();
  }while (*srcptr==',');
  putbyte(postbyte);
@@ -966,7 +968,7 @@ pseudoop(int co,struct symrecord * lp)
         loccounter+=operand;
         if(generating&&pass==2)for(i=0;i<operand;i++)
                      fputc(0,objfile);
-        break;  
+        break;
  case 5:/* EQU */
         operand=scanexpr(0);
         if(!lp)error|=32;
@@ -988,14 +990,14 @@ pseudoop(int co,struct symrecord * lp)
          srcptr++;
          while(*srcptr!='\"'&&*srcptr)
           putbyte(*srcptr++);
-         if(*srcptr=='\"')srcptr++; 
+         if(*srcptr=='\"')srcptr++;
         } else {
-          putbyte(scanexpr(0)); 
+          putbyte(scanexpr(0));
           if(unknown&&pass==2)error|=4;
-        }  
+        }
         skipspace();
         } while(*srcptr==',');
-        break; 
+        break;
  case 8:/* FCC */
         setlabel(lp);
         skipspace();
@@ -1011,16 +1013,16 @@ pseudoop(int co,struct symrecord * lp)
          if(*srcptr==',')srcptr++;
          skipspace();
          putword(scanexpr(0));
-         if(unknown&&pass==2)error|=4; 
-         skipspace();     
+         if(unknown&&pass==2)error|=4;
+         skipspace();
         } while(*srcptr==',');
-        break;  
+        break;
  case 12: /* ORG */
          operand=scanexpr(0);
          if(unknown)error|=4;
          if(generating&&pass==2)for(i=0;i<(unsigned short)operand-loccounter;i++)
                       fputc(0,objfile);
-         loccounter=operand;      
+         loccounter=operand;
  }
 }
 
@@ -1040,11 +1042,11 @@ processline()
  if(isalnum(*srcptr)) {
   scanname();lp=findsym(namebuf);
   if(*srcptr==':') srcptr++;
- } 
+ }
  skipspace();
  if(isalnum(*srcptr)) {
-  scanname(); 
-  op=findop(namebuf);  
+  scanname();
+  op=findop(namebuf);
   if(op) {
    if(op->cat!=13){
      setlabel(lp);
@@ -1069,7 +1071,7 @@ processline()
    }
    c=*srcptr;
    if (debug) fprintf(stderr,"DEBUG: processline: mode=%d, opsize=%d, error=%d, postbyte=%02X c=%c\n",mode,opsize,error,postbyte,c);
-   if(c!=' '&&*(srcptr-1)!=' '&&c!=0&&c!=';')error|=2; 
+   if(c!=' '&&*(srcptr-1)!=' '&&c!=0&&c!=';')error|=2;
   }
   else error|=0x8000;
  }else setlabel(lp);
@@ -1086,12 +1088,12 @@ usage(char*nm)
   fprintf(stderr,"Usage: %s [-d] [-o objname] [-l listname] srcname\n",nm);
   exit(2);
 }
- 
+
 
 getoptions(int c,char*v[])
 {
  int i=0;
- if(c==1)usage(v[0]); 
+ if(c==1)usage(v[0]);
  if(strcmp(v[1],"-d")==0) {
    debug=1;
    i++;
@@ -1114,10 +1116,10 @@ getoptions(int c,char*v[])
     objname[i]=srcname[i];
   }
  }
- listing=listname[0]!=0;       
+ listing=listname[0]!=0;
 }
 
-expandline() 
+expandline()
 {
  int i=0,j=0,k,j1;
  for(i=0;i<128&&j<128;i++)
@@ -1128,7 +1130,7 @@ expandline()
   if(inpline[i]=='\t') {
     j1=j;
     for(k=0;k<8-j1%8 && j<128;k++)srcline[j++]=' ';
-  }else srcline[j++]=inpline[i];     
+  }else srcline[j++]=inpline[i];
  }
  srcline[127]=0;
 }
@@ -1155,7 +1157,7 @@ processfile(char *name)
  }
  fclose(srcfile);
  lineno=oldno;
- strcpy(curname,oldname); 
+ strcpy(curname,oldname);
 }
 
 main(int argc,char *argv[])
@@ -1171,14 +1173,14 @@ main(int argc,char *argv[])
   fprintf(stderr,"%d Pass 1 Errors, Continue?",errors);
   c=getchar();
   if(c=='n'||c=='N') exit(3);
- } 
+ }
  pass=2;
  loccounter=0;
  errors=0;
  generating=0;
  terminate=0;
  if(listing&&((listfile=fopen(listname,"w"))==0)) {
-  fprintf(stderr,"Cannot open list file"); 
+  fprintf(stderr,"Cannot open list file");
   exit(4);
  }
  if((objfile=fopen(objname,"wb"))==0) {
@@ -1192,6 +1194,6 @@ main(int argc,char *argv[])
   outsymtable();
   fclose(listfile);
  }
- fclose(objfile); 
+ fclose(objfile);
 }
-     
+
