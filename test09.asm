@@ -1,8 +1,8 @@
         ; 6809 Test program.
 
-testnr  equ 128
+testnr  equ 32
 
-        org $400
+        org $100
         jmp entry
 error  ldx #errmsg
         bsr outs
@@ -10,20 +10,20 @@ error  ldx #errmsg
         bsr outa
         ldx #newline
         bsr outs
-        swi
+        sync
 
 errmsg fcb "ERROR ",0
 newline fcb 13,10,0
 outs    ldb ,x+
         beq done1
-        jsr 3
+        swi2
         bra outs
 done1   rts
 outdig  addb # 48
         cmpb # 57
         bls  od2
         addb #7
-od2     jsr 3
+od2     swi2
         rts
 outa    tfr a,b
         lsrb
@@ -128,7 +128,7 @@ goot16  tfr cc,a
         lbne error
         jsr good
 
-        lds #$8000       ; test #2: registers and their values, tfr, exg
+        lds #0       ; test #2: registers and their values, tfr, exg
         lda #$28
         ldb #$7f
         ldu #3417
@@ -148,7 +148,7 @@ goot16  tfr cc,a
         lbne error
         cmpu #3417
         lbne error
-        cmps #$8000
+        cmps #0
         lbne error
         exg x,y
         cmpx #16555
@@ -188,7 +188,7 @@ here    cmpx #here
         tfr u,s
         cmps #3417
         lbne error
-        lds #$8000
+        lds #0
         clra
         tfr b,cc
         tfr cc,a
@@ -218,10 +218,6 @@ here    cmpx #here
         lbcc error
         lda #216
         adda #40
-
-
-
-
         lbne error
         lda #80
         adda #40
@@ -307,7 +303,7 @@ here    cmpx #here
         ldb #2
         mul
         lbeq error
-        lbcs error
+        lbcc error
         cmpd #256
         lbne error
         lda #0
@@ -320,7 +316,7 @@ here    cmpx #here
         lda #10
         ldb #20
         mul
-        lbcc error
+        lbcs error
         cmpd #200
         lbne error
         lda #100
@@ -460,8 +456,8 @@ testdat	fcb 1,2,3,4,5,6,7,8,9,10
 td1	fdb testdat+2
 next1   
 
-        swi
-        end 
+        sync
+        end $100
 
 
 

@@ -1,10 +1,7 @@
 /* A09, 6809 Assembler. 
    
-   (C) Copyright 1993,1994 L.C. Benschop. 
-   This verision of the program is distributed under the terms and conditions 
-   of the GNU General Public License version 2. See file the COPYING for details.	
-   THERE IS NO WARRANTY ON THIS PROGRAM. 
-	
+   (C) Copyright 1993, L.C. Benschop. 
+
    Generates binary image file from the lowest to
    the highest address with actually assembled data.
    
@@ -17,8 +14,8 @@
                   
    Options
    -o filename name of the output file (default name minus a09 suffix) 
-   -s filename name of the s-record output file (default its a binary file)
    -l filename list file name (default no listing)
+   -d enable debugging
    
    recognized pseudoops:
     extern public
@@ -26,16 +23,20 @@
     org equ set setdp
     fcb fcw fdb fcc rmb  
     end include title   
-   Not all of these are actually IMPLEMENTED!!!!!! 
-    
-   v0.1 93/11/03 Initial version.
-    
-   v0.2 94/03/21 Fixed PC relative addressing bug
-       	         Added SET, SETDP, INCLUDE. IF/ELSE/ENDIF
-    	         No macros yet, and no separate linkable modules.
-    
+
+   Revisions:
+	2012-06-04 j at klasek at
+		Fixed: parsing register indexed modes/operands
+		New: debugging parameter/option.
+	2012-06-18 j at klasek at
+		Fixed: pshu opcode 
+	2012-06-22 j at klasek at
+		Fixed: backported:
+			doaddress() opcode and offset handling from 1994 version
+			pass 2 error output
 */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -45,6 +46,8 @@
 #define MAXLISTBYTES 7
 #define FNLEN 30
 #define LINELEN 128
+
+static int debug=0;
 
 struct oprecord{char * name; 
                 unsigned char cat; 
@@ -232,7 +235,7 @@ struct regrecord regtable[]=
                  {{"D",0x00,0x06},{"X",0x01,0x10},{"Y",0x02,0x20},
                   {"U",0x03,0x40},{"S",0x04,0x40},{"PC",0x05,0x80},
                   {"A",0x08,0x02},{"B",0x09,0x04},{"CC",0x0a,0x01},
-                  {"CCR",0x0a,0x01},{"DP",0x0b,0x08},{"DPR",0x0b,0x08}};
+                  {"CCR",0x0a,0x01},{"DP",0x0b,0x03},{"DPR",0x0b,0x03}};
 
 struct regrecord * findreg(char *nm)
 {
@@ -399,7 +402,7 @@ short scanfactor()
   case '*' : srcptr++;exprcat|=2;return loccounter;
   case '$' : return scanhex();
   case '%' : return scanbin();
-  case '@' : return scanoct();
+  case '&' : return scanoct();
   case '\'' : return scanchar();
   case '(' : srcptr++;t=scanexpr(0);skipspace();
              if(*srcptr==')')srcptr++;else error|=1;
@@ -548,6 +551,7 @@ int scanindexreg()
  char c;
  c=*srcptr;
  if(islower(c))c-=32;
+ if (debug) fprintf(stderr,"DEBUG: scanindexreg: indexreg=%d, mode=%d, opsize=%d, error=%d, postbyte=%02X\n",c,mode,opsize,error,postbyte);
  switch(c) {
   case 'X':return 1;
   case 'Y':postbyte|=0x20;return 1;
@@ -586,10 +590,8 @@ scanspecial()
  }    
 }
 
-
 scanindexed()
 {
- int offs;
  set3();
  postbyte=0;
  if(scanindexreg()) {
@@ -614,6 +616,7 @@ scanindexed()
     } 
   }    
   mode++;postbyte+=0x8c;
+  if(opsize==0)if(unknown||!certain)opsize=3;else opsize=2;
   if(opsize==1)opsize=2;    
  }
 }
@@ -634,6 +637,7 @@ scanoperands()
   c=*srcptr;
   mode=5;
  }
+ if (debug) fprintf(stderr,"DEBUG: scanoperands: c=%c (%02X)\n",c,c);
  switch(c) {
  case 'D': case 'd':
   oldsrcptr=srcptr;
@@ -642,7 +646,8 @@ scanoperands()
   if(*srcptr!=',')RESTORE else {
      postbyte=0x8b;
      srcptr++;
-     if(!scanindexreg())RESTORE else {srcptr++;set3();}
+     if(!scanindexreg())RESTORE else set3();
+     srcptr++;
   }
   break;    
  case 'A': case 'a':
@@ -652,7 +657,8 @@ scanoperands()
   if(*srcptr!=',')RESTORE else {
      postbyte=0x86;
      srcptr++;
-     if(!scanindexreg())RESTORE else {srcptr++;set3();}
+     if(!scanindexreg())RESTORE else set3();
+     srcptr++;
   } 
   break;
  case 'B': case 'b': 
@@ -662,7 +668,10 @@ scanoperands()
   if(*srcptr!=',')RESTORE else {
      postbyte=0x85;
      srcptr++;
-     if(!scanindexreg())RESTORE else {srcptr++;set3();}
+     if (debug) fprintf(stderr,"DEBUG: scanoperands: breg preindex: c=%c (%02X)\n",*srcptr,*srcptr);
+     if(!scanindexreg())RESTORE else set3();
+     srcptr++;
+     if (debug) fprintf(stderr,"DEBUG: scanoperands: breg: postindex c=%c (%02X)\n",*srcptr,*srcptr);
   }
   break;   
  case ',':
@@ -703,6 +712,7 @@ scanoperands()
    } else mode=opsize-1;
   }   
  }
+ if (debug) fprintf(stderr,"DEBUG: scanoperands: mode=%d, error=%d, postbyte=%02X\n",mode,error,postbyte);
  if(mode>=5) {
   skipspace();
   postbyte|=0x10;
@@ -712,43 +722,12 @@ scanoperands()
 }
 
 unsigned char codebuf[128];
-int codeptr; /* byte offset within instruction */
-int suppress; /* 0=no suppress 1=until ENDIF 2=until ELSE 3=until ENDM */
-int ifcount;  /* count of nested IFs within suppressed text */
-
-unsigned char outmode; /* 0 is binary, 1 is s-records */
-
-unsigned short hexaddr;
-int hexcount;
-unsigned char hexbuffer[16];
-unsigned int chksum;
-
-flushhex()
-{
- int i;
- if(hexcount){
-  fprintf(objfile,"S1%02X%04X",(hexcount+3)&0xff,hexaddr&0xffff);
-  for(i=0;i<hexcount;i++)fprintf(objfile,"%02X",hexbuffer[i]);
-  chksum+=(hexaddr&0xff)+((hexaddr>>8)&0xff)+hexcount+3;
-  fprintf(objfile,"%02X\n",0xff-(chksum&0xff));
-  hexaddr+=hexcount;
-  hexcount=0;
-  chksum=0;
- }
-}
-
-outhex(unsigned char x) 
-{
- if(hexcount==16)flushhex();
- hexbuffer[hexcount++]=x;
- chksum+=x;
-}
+int codeptr;
 
 outbuffer()
 {
  int i;
- for(i=0;i<codeptr;i++)
-   if(!outmode)fputc(codebuf[i],objfile);else outhex(codebuf[i]);
+ for(i=0;i<codeptr;i++)fputc(codebuf[i],objfile);
 }
 
 char *errormsg[]={"Error in expression",
@@ -823,10 +802,9 @@ doaddress() /* assemble the right addressing bytes for an instruction */
     }
     break;
  case 4: case 6: offs=(unsigned short)operand-loccounter-codeptr-2;
-                if(offs<-128||offs>=128||opsize==3||unknown||!certain) {
+                if(offs<-128||offs>=128||opsize==3) {
                  if((!unknown)&&opsize==2)error|=16;
                  offs--;
-                 opsize=3;
                  postbyte++;
                 }
                 putbyte(postbyte);
@@ -863,6 +841,7 @@ lea(int co)
    postbyte=0x8f;
    mode=3;
  }
+ if (debug) fprintf(stderr,"DEBUG: lea: mode=%d, opsize=%d, error=%d, postbyte=%02X, *src=%c\n",mode,opsize,error,postbyte,*srcptr);
  doaddress();
 }
 
@@ -937,7 +916,7 @@ oneaddr(int co)
  case 0: error|=2;break;
  case 1: putbyte(co);break;
  case 2: putbyte(co+0x70);break;
- default: putbyte(co+0x60);break;
+ case 3: putbyte(co+0x60);break;
  }
  doaddress();
 }
@@ -979,27 +958,22 @@ pseudoop(int co,struct symrecord * lp)
 {
  int i;
  char c;
- char fname[FNLEN+1];
  switch(co) {
  case 0:/* RMB */
         setlabel(lp);
         operand=scanexpr(0);
         if(unknown)error|=4;
         loccounter+=operand;
-        if(generating&&pass==2) {
-           if(!outmode)for(i=0;i<operand;i++)fputc(0,objfile);
-           else flushhex();  
-        }   
-        hexaddr=loccounter;
+        if(generating&&pass==2)for(i=0;i<operand;i++)
+                     fputc(0,objfile);
         break;  
  case 5:/* EQU */
         operand=scanexpr(0);
         if(!lp)error|=32;
         else {
-         if(lp->cat==13||lp->cat==6||
-            (lp->value==(unsigned short)operand&&pass==2)) {
+         if(lp->cat==13||lp->cat==6||pass==2) {
           if(exprcat==2)lp->cat=2;
-          else lp->cat=0;
+          else lp->cat=1;
           lp->value=operand;
          } else error|=8;
         }
@@ -1040,58 +1014,13 @@ pseudoop(int co,struct symrecord * lp)
          if(unknown&&pass==2)error|=4; 
          skipspace();     
         } while(*srcptr==',');
-        break;
- case 1: /* ELSE */
-        suppress=1;
-        break;
- case 10: /* IF */
-        operand=scanexpr(0);
-        if(unknown)error|=4;
-        if(!operand)suppress=2;
-        break;                
+        break;  
  case 12: /* ORG */
          operand=scanexpr(0);
          if(unknown)error|=4;
-         if(generating&&pass==2) {
-           for(i=0;i<(unsigned short)operand-loccounter;i++)
-                if(!outmode)fputc(0,objfile);else flushhex();
-         }             
-         loccounter=operand;
-         hexaddr=loccounter;
-         break;
-  case 14: /* SETDP */
-         operand=scanexpr(0);
-         if(unknown)error|=4;
-         if(!(operand&255))operand=(unsigned short)operand>>8;
-         if((unsigned)operand>255)operand=-1;
-         dpsetting=operand;              
-         break;
-  case 15: /* SET */
-        operand=scanexpr(0);
-        if(!lp)error|=32;
-        else {
-         if(lp->cat&1||lp->cat==6) {
-          if(exprcat==2)lp->cat=3;
-          else lp->cat=1;
-          lp->value=operand;
-         } else error|=8;
-        }
-        break;
-   case 2: /* END */
-   	terminate=1;
-   	break;     
-   case 16: /* INCLUDE */     
-        skipspace();
-        if(*srcptr=='"')srcptr++;
-        for(i=0;i<FNLEN;i++) {
-          if(*srcptr==0||*srcptr=='"')break;
-          fname[i]=*srcptr++;
-        }
-        fname[i]=0;
-        processfile(fname);
-        codeptr=0;
-        srcline[0]=0;
-        break; 
+         if(generating&&pass==2)for(i=0;i<(unsigned short)operand-loccounter;i++)
+                      fputc(0,objfile);
+         loccounter=operand;      
  }
 }
 
@@ -1139,6 +1068,7 @@ processline()
    case 13:pseudoop(co,lp);
    }
    c=*srcptr;
+   if (debug) fprintf(stderr,"DEBUG: processline: mode=%d, opsize=%d, error=%d, postbyte=%02X c=%c\n",mode,opsize,error,postbyte,c);
    if(c!=' '&&*(srcptr-1)!=' '&&c!=0&&c!=';')error|=2; 
   }
   else error|=0x8000;
@@ -1151,32 +1081,9 @@ processline()
  loccounter+=codeptr;
 }
 
-suppressline()
-{
- struct oprecord * op;
- srcptr=srcline;
- oldlc=loccounter;
- codeptr=0;
- if(isalnum(*srcptr)) {
-  scanname();
-  if(*srcptr==':')srcptr++;
- }
- skipspace();
- scanname();op=findop(namebuf);
- if(op && op->cat==13) {
-  if(op->code==10) ifcount++;
-  else if(op->code==3) {
-   if(ifcount>0)ifcount--;else if(suppress==1|suppress==2)suppress=0;
-  } else if(op->code==1) {
-   if(ifcount==0 && suppress==2)suppress=0;
-  }
- }  
- if(pass==2&&listing)outlist();
-}
-
 usage(char*nm)
 {
-  fprintf(stderr,"Usage: %s [-o objname] [-l listname] srcname\n",nm);
+  fprintf(stderr,"Usage: %s [-d] [-o objname] [-l listname] srcname\n",nm);
   exit(2);
 }
  
@@ -1185,15 +1092,13 @@ getoptions(int c,char*v[])
 {
  int i=0;
  if(c==1)usage(v[0]); 
+ if(strcmp(v[1],"-d")==0) {
+   debug=1;
+   i++;
+ }
  if(strcmp(v[1],"-o")==0) {
    if(c<4)usage(v[0]);
    strcpy(objname,v[2]);
-   i+=2;
- }
- if(strcmp(v[i+1],"-s")==0) {
-   if(c<4+i)usage(v[0]);
-   strcpy(objname,v[i+2]);
-   outmode=1;
    i+=2;
  }
  if(strcmp(v[i+1],"-l")==0) {
@@ -1246,14 +1151,9 @@ processfile(char *name)
    expandline();
    lineno++;
    srcptr=srcline;
-   if(suppress)suppressline(); else processline();
+   processline();
  }
  fclose(srcfile);
- if(suppress) {
-   fprintf(stderr,"improperly nested IF statements in %s",curname);
-   errors++;
-   suppress=0;
- }
  lineno=oldno;
  strcpy(curname,oldname); 
 }
@@ -1281,7 +1181,7 @@ main(int argc,char *argv[])
   fprintf(stderr,"Cannot open list file"); 
   exit(4);
  }
- if((objfile=fopen(objname,outmode?"w":"wb"))==0) {
+ if((objfile=fopen(objname,"wb"))==0) {
   fprintf(stderr,"Cannot write object file\n");
   exit(4);
  }
@@ -1292,10 +1192,6 @@ main(int argc,char *argv[])
   outsymtable();
   fclose(listfile);
  }
- if(outmode){
-  flushhex();
-  fprintf(objfile,"S9030000FC\n");
- } 
  fclose(objfile); 
 }
      

@@ -1,0 +1,33 @@
+
+Eratostenes Sieve
+=================
+J.E. Klasek j AT klasek at
+
+
+
+# compile
+
+make
+
+# start (with memory dump)
+
+v09 -d erat-sieve
+
+# hex editor on memory dump ...
+
+he dump.v09
+
+# variable area ...
+#                                                      prime count:  vv vv
+00004FEC   F3 07 F7 EF  08 DD E8 FF  95 4F A7 08  45 FC 5A D7  9F DE 07 6B  .........O..E.Z....k
+00005000   FF FF FF 00  FF FF 00 FF  FF 00 FF 00  00 FF FF 00  00 FF 00 FF  ....................
+
+
+# convert hex value to decimal with dc command ...
+dc
+16 i
+076B p
+1899
+
+# 1899 is the correct value for the prime count!
+

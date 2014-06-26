@@ -8,18 +8,12 @@
 	jsr outc	
 	
 	
-	ldy #0
-loop	ldx #data
-	lda #(enddata-data)
-	clrb	
-loop2:	addb ,x+
-	deca
-	bne loop2
-	cmpb #210
-	lbne error		
-        leay -1,y
-	bne loop
-
+	ldx #40
+inloop	jsr inc
+	jsr outc
+	leax -1,x
+	bne inloop
+	
         ldb #'b'
 	jsr outc
 	jmp realexit 
@@ -31,10 +25,11 @@ error	ldb #'e'
 outc	swi2
 	rts
 
+inc	swi3
+	rts
+
 realexit sync
 
-data 	fcb 1,2,3,4,5,6,7,8,9,10
-	fcb 11,12,13,14,15,16,17,18,19,20
 enddata
   
 	end

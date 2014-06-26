@@ -1,53 +1,73 @@
+#
+# Makefile Sim6809
+#
+# 2011-213,2014-06-25 J.E. Klasek, j AT klasek at
+#
 
-CC=gcc
-CFLAGS= -O1
-V09FLAGS= -DUSE_TERMIOS #-DBIG_ENDIAN
+ASM=a09
+CFLAGS=-O3 -fomit-frame-pointer -DTERM_CONTROL
 
-all: a09 v09 v09.rom examples 
+all: v09 v09t ef09 uslash crc16 crc32 input printval erat-sieve 
+
+v09: v09.c
+
+v09t: v09.c
+	$(CC) $(CFLAGS) -DTRACE -o $@ $<
 
 a09: a09.c
-	$(CC) -o a09 $(CFLAGS) a09.c
 
-v09: v09.o engine.o io.o
-	$(CC) -o v09 $(CFLAGS) v09.o engine.o io.o
 
-v09.o: v09.c v09.h
-	$(CC) -c $(CFLAGS) $(V09FLAGS) v09.c
+# ------------------------------------
 
-engine.o: engine.c v09.h
-	$(CC) -c $(CFLAGS) $(V09FLAGS) engine.c
+bench09: bench09.asm $(ASM)
+	$(ASM) $<
 
-io.o: io.c v09.h
-	$(CC) -c $(CFLAGS) $(V09FLAGS) io.c
+test09: test09.asm $(ASM)
+	$(ASM) $<
 
-v09.rom: makerom monitor.s 
-	./makerom <monitor.s
+input: input.asm $(ASM)
+	$(ASM) $<
 
-monitor.s: monitor.asm
-	./a09 -s monitor.s -l monitor.lst monitor.asm
+uslash: uslash.asm $(ASM)
+	$(ASM) -l $@.lst  $<
 
-makerom: makerom.c
-	$(CC) -o makerom makerom.c
+crc16: crc16.asm $(ASM)
+	$(ASM) -l $@.lst  $<
 
-examples: test09 bench09 basic bin2dec asmtest 
+crc32: crc32.asm $(ASM)
+	$(ASM) -l $@.lst  $<
 
-test09: test09.asm
-	./a09 -l test09.lst test09.asm
+ef09: ef09.asm $(ASM)
+	$(ASM) -l $@.lst  $<
 
-bench09: bench09.asm
-	./a09 -l bench09.lst bench09.asm
+printval: printval.asm $(ASM)
+	$(ASM) -l $@.lst  $<
 
-basic: basic.asm
-	./a09 -l basic.lst basic.asm
+erat-sieve: erat-sieve.asm
+	$(ASM) -l $@.lst  $<
 
-bin2dec: bin2dec.asm
-	./a09 -l bin2dec.lst bin2dec.asm
+# ------------------------------------
 
-asmtest: asmtest.asm
-	./a09 -l asmtest.lst asmtest.asm
+cleanall: clean
+	rm -f v09 $(ASM) bench09 test09 ef09
 
 clean:
-	rm *.o
-	rm a09 v09 makerom
-	rm *.lst
-	rm test09 bench09 basic bin2dec asmtest
+	rm -f core *.BAK
+
+archive: clean
+	@(cd ..; \
+	tar cvfz sim6809.tgz sim6809 )
+
+# ------------------------------------
+
+DIST=sim6809-jk-edition
+FILES=ef09.asm bench09.asm test09.asm printval.asm uslash.asm crc32.asm erat-sieve.asm input.asm crc16.asm $(ASM).c v09.c v09tc.c README info.txt erat-sieve.txt $(ASM) v09 v09t
+
+dist:
+	mkdir -p $(DIST)
+	cp -p $(FILES) $(DIST)/.
+	cp -p Makefile.dist $(DIST)/Makefile
+	cp -p info.en.txt $(DIST)/info.txt
+	tar cvfz $(DIST).tgz $(DIST)
+	rm -rf $(DIST)
+
