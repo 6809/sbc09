@@ -4,35 +4,36 @@
 	lds #$100	
 	ldu #$8000	
 
-	ldd #$0000	; lowword
+	; sample parameters on stack ...
+	ldd #$0000	; dividend low word
 	pshu d
-	ldd #$5800	; high word
+	ldd #$5800	; dividend high word
 	pshu d
 	ldd #$3000	; divisor
 	pshu d
 
-USLASH	ldd 2,u		; divident H/L Word tauschen
+USLASH	ldd 2,u		; dividend swap H/L word
 	ldx 4,u
 	stx 2,u
 	std 4,u
-	asl 3,u		; initial L Word shiften
+	asl 3,u		; initial shift of L word
 	rol 2,u
 	ldx #$10
-USL1:	rol 5,u		; H Word shift
+USL1:	rol 5,u		; shift H word
 	rol 4,u
 	ldd 4,u
-	subd ,u		; passt Divisor?
+	subd ,u		; does divisor fit?
 	clc
 	bmi USL2
-	std 4,u		; passt -> Quot = 1
+	std 4,u		; fits -> quotient = 1
 	sec
-USL2:	rol 3,u		; L Wort/Quotient
+USL2:	rol 3,u		; L word/quotient
 	rol 2,u
 	leax -1,x
 	bne USL1
 	leau 2,u
 
-	ldx ,u		; quot
+	ldx ,u		; quotient
 	ldd 2,u		; remainder
 
 realexit sync
