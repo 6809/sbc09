@@ -7,14 +7,14 @@
 
 ; Testvalues:
 ;
-; DIVH  DIVL    DVSR    QUOT    REM
-; 0100  0000    FFFF    0100    0100
-; 0000  0001    8000    0000    8000
-; 0000  5800    3000    0001    1800
-; 5800  0000    3000    ????    FFFF
+; DIVH  DIVL    DVSR    QUOT    REM	comment
+; 0100  0000    FFFF    0100    0100	maximum divisor
+; 0000  0001    8000    0000    8000	underflow
+; 0000  5800    3000    0001    1800	normal divsion
+; 5800  0000    3000    ????    FFFF	overflow
 
-DIVH    EQU $0100
-DIVL    EQU $0000
+DIVH    EQU $0000
+DIVL    EQU $8000
 DVSR    EQU $FFFF
 
         bra EFORTH
@@ -80,12 +80,12 @@ EFORTH:
 ;   U/          ( udl udh un -- ur uq )
 ;               Unsigned divide of a double by a single. Return mod and quotient.
 ;       
-; Handles 2 special cases:
+; Special cases:
 ;       1. overflow: quotient overflow if dividend is to great (remainder = divisor),
-;               remainder is set to $FFFF.
+;               remainder is set to $FFFF -> special handling.
 ;               This is checked also right before the main loop.
 ;       2. underflow: divisor does not fit into dividend -> remainder
-;               get the value of the dividend.
+;               get the value of the dividend -> automatically covered.
 
 USLASH2:
         ldx #16
@@ -116,11 +116,6 @@ UMMODOV:
         ldd #$FFFF      ; remainder = FFFF (-1) marks overflow
                                 ; (case 1)
 UMMOD4:         
-        cmpx #0         ; quotient = 0 (underflow) ?
-        bne UMMOD5
-        ldd 2,s         ; yes -> remainder = dividend low
-                                ; (case 2)
-UMMOD5:
         leas 2,s        ; un (divisor thrown away)
         stx ,s          ; quotient to TOS
         std 2,s         ; remainder 2nd
