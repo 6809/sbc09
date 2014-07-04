@@ -1,5 +1,14 @@
-        ; 6809 32/16 divison
+        ; 6809 32/16 divison for a forth environment
         ; 2012-06-20, 2014-07-01 J.E. Klasek j+forth@klasek.at 
+        ;
+        ; There are two implementations:
+        ;       TALBOT  just for analysis, not really used here.
+        ;       EFORTH  advanced and optimized version for ef09
+        ;
+        ; EFORTH version's special cases:
+        ;   overflow:           quotient = $FFFF, remainder = divisor
+        ;   underflow:          quotient = $0000, remainder = divisor
+        ;   division by zero:   quotient = $FFFF, remainder = $0000
 
         org $100
         lds #$100       
@@ -7,17 +16,20 @@
 
 ; Testvalues:
 ;
-; DIVH  DIVL    DVSR    QUOT    REM	comment
-; 0100  0000    FFFF    0100    0100	maximum divisor
-; 0000  0001    8000    0000    8000	underflow
-; 0000  5800    3000    0001    1800	normal divsion
-; 5800  0000    3000    ????    FFFF	overflow
+; DIVH  DIVL    DVSR    QUOT    REM     comment
+;
+; 0100  0000    FFFF    0100    0100    maximum divisor
+; 0000  0001    8000    0000    8000    underflow
+; 0000  5800    3000    0001    1800    normal divsion
+; 5800  0000    3000    FFFF    3000    overflow
+; 0000  0001    0000    FFFF    0000    overflow (division by zero)
+;
 
 DIVH    EQU $0000
-DIVL    EQU $8000
-DVSR    EQU $FFFF
+DIVL    EQU $5800
+DVSR    EQU $3000
 
-        bra EFORTH
+        bra EFORTH      ; comment out to try TALBOT's version
 
         ; ------------------------------------
         ; Version from Talbot System FIG Forth
@@ -52,10 +64,12 @@ USL2:   rol 3,u         ; L word/quotient
         rol 2,u
         leax -1,x
         bne USL1
-        leau 2,u
+        leau 2,u        ; drop divisor from parameter stack
 
-        ldx ,u          ; quotient
-        ldd 2,u         ; remainder
+                        ; into registers for simulator ...
+
+        ldx ,u          ; quotient on TOS
+        ldd 2,u         ; remainder on 2nd
 
 realexit:
         sync
@@ -113,7 +127,8 @@ UMMOD3: rol 5,s         ; udl, quotient shifted in
         cmpd ,s         ; remainder >= divisor -> overflow
         blo UMMOD4
 UMMODOV:
-        ldd #$FFFF      ; remainder = FFFF (-1) marks overflow
+        ldd ,s          ; remainder set to divisor
+        ldx #$FFFF      ; quotient = FFFF (-1) marks overflow
                                 ; (case 1)
 UMMOD4:         
         leas 2,s        ; un (divisor thrown away)
