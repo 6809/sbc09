@@ -19,7 +19,7 @@
 ; DIVH  DIVL    DVSR    QUOT    REM     comment
 ;
 ; 0100  0000    FFFF    0100    0100    maximum divisor
-; 0000  0001    8000    0000    8000    underflow
+; 0000  0001    8000    0000    0001    underflow (REM = DIVL)
 ; 0000  5800    3000    0001    1800    normal divsion
 ; 5800  0000    3000    FFFF    3000    overflow
 ; 0000  0001    0000    FFFF    0000    overflow (division by zero)
