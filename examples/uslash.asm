@@ -7,7 +7,7 @@
         ;
         ; EFORTH version's special cases:
         ;   overflow:           quotient = $FFFF, remainder = divisor
-        ;   underflow:          quotient = $0000, remainder = divisor
+        ;   underflow:          quotient = $0000, remainder = dividend low
         ;   division by zero:   quotient = $FFFF, remainder = $0000
 
         org $100
