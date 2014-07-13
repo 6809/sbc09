@@ -32,10 +32,23 @@
    The program reads a binary image file at $100 and runs it from there.
    The file name must be given on the command line.
 
-	2013-10-07 JK
-		New: print ccreg with flag name in lower/upper case depending on flag state.
-	2013-10-20 JK
-		New: Show instruction disassembling in trace mode.
+   Revisions:
+        2012-06-05 johann AT klasek at
+                Fixed: com with C "NOT" operator ... 0^(value) did not work!
+        2012-06-06
+                Fixed: changes from 1994 release (flag handling)
+                        reestablished.
+        2012-07-15 JK
+                New: option parsing, new option -d (dump memory on exit)
+        2013-10-07 JK
+                New: print ccreg with flag name in lower/upper case depending on flag state.
+        2013-10-20 JK
+                New: Show instruction disassembling in trace mode.
+        2014-07-01 JK
+                Fixed: disassembling output: cmpd
+        2014-07-11 JK
+                Fixed: undocumented tfr/exg register combinations.
+                        http://www.6809.org.uk/dragon/illegal-opcodes.shtml
 
 */
 
@@ -74,6 +87,9 @@ typedef unsigned short Word;
 /* 6809 registers */
 Byte ccreg,dpreg;
 Word xreg,yreg,ureg,sreg,ureg,pcreg;
+
+Byte fillreg = 0xff;
+Word wfillreg = 0xffff;
 
 Word pcreg_prev;
 
@@ -139,22 +155,30 @@ static int cycles;
 unsigned long cycles_sum;
 
 void da_inst(char *inst, char *reg, int cyclecount) {
-	*dinst = 0;
-	*dops = 0;
-	if (inst != NULL) strcat(dinst, inst);
-	if (reg != NULL) strcat(dinst, reg);
-	cycles += cyclecount;
+        *dinst = 0;
+        *dops = 0;
+        if (inst != NULL) strcat(dinst, inst);
+        if (reg != NULL) strcat(dinst, reg);
+        cycles += cyclecount;
 }
 
 void da_inst_cat(char *inst, int cyclecount) {
-	if (inst != NULL) strcat(dinst, inst);
-	cycles += cyclecount;
+        if (inst != NULL) strcat(dinst, inst);
+        cycles += cyclecount;
 }
 
 void da_ops(char *part1, char* part2, int cyclecount) {
-	if (part1 != NULL) strcat(dops, part1);
-	if (part2 != NULL) strcat(dops, part2);
-	cycles += cyclecount;
+        if (part1 != NULL) strcat(dops, part1);
+        if (part2 != NULL) strcat(dops, part2);
+        cycles += cyclecount;
+}
+
+void da_reg(Byte b)
+{
+  char *reg[] = { "d", "x", "y", "u", "s", "pc", "?", "?",
+                  "a", "b", "cc", "dp", "?", "?", "?", "?" };
+  da_ops( reg[(b>>4) & 0xf], ",", 0);
+  da_ops( reg[b & 0xf], NULL, 0);
 }
 
 /* Now follow the posbyte addressing modes. */
@@ -326,11 +350,11 @@ Word postbyte()
  idx=((pb & 0x60) >> 5);
  if(pb & 0x80) {
   if( pb & 0x10)
-	da_ops("[",NULL,3);
+        da_ops("[",NULL,3);
   temp=(*pbtable[pb & 0x0f])();
   if( pb & 0x10) {
-	temp=GETWORD(temp);
-	da_ops("]",NULL,0);
+        temp=GETWORD(temp);
+        da_ops("]",NULL,0);
   }
   return temp;
  } else {
@@ -925,12 +949,12 @@ swi()
 }
 
 
-Word *wordregs[]={(Word*)d_reg,&xreg,&yreg,&ureg,&sreg,&pcreg,&sreg,&pcreg};
+Word *wordregs[]={(Word*)d_reg,&xreg,&yreg,&ureg,&sreg,&pcreg,&wfillreg,&wfillreg};
 
 #if CPU_BIG_ENDIAN
-Byte *byteregs[]={d_reg,d_reg+1,&ccreg,&dpreg};
+Byte *byteregs[]={d_reg,d_reg+1,&ccreg,&dpreg,&fillreg,&fillreg,&fillreg,&fillreg};
 #else
-Byte *byteregs[]={d_reg+1,d_reg,&ccreg,&dpreg};
+Byte *byteregs[]={d_reg+1,d_reg,&ccreg,&dpreg,&fillreg,&fillreg,&fillreg,&fillreg};
 #endif
 
 tfr()
@@ -938,27 +962,55 @@ tfr()
  Byte b;
  da_inst("tfr",NULL,7);
  IMMBYTE(b)
+ da_reg(b);
+ Word v;
+ // source in higher nibble (highest bit set means 8 bit reg.)
  if(b&0x80) {
-  *byteregs[b&0x03]=*byteregs[(b&0x30)>>4];
+  v=*byteregs[(b&0x70)>>4] | (b&0x08 ? 0 : 0xff00);
  } else {
-  *wordregs[b&0x07]=*wordregs[(b&0x70)>>4];
+  v=*wordregs[(b&0x70)>>4];
+ }
+ // dest in lower nibble (highest bit set means 8 bit reg.)
+ if(b&0x8) {
+  *byteregs[b&0x07]=v&0xff;
+  fillreg=0xff;  // keep fillvalue
+ } else {
+  *wordregs[b&0x07]=v;
+  wfillreg = 0xffff;  // keep fillvalue
  }
 }
 
 exg()
 {
  Byte b;
- Word w;
- da_inst("tfr",NULL,8);
+ Word f;
+ Word t;
+ da_inst("exg",NULL,8);
  IMMBYTE(b)
+ da_reg(b);
  if(b&0x80) {
-  w=*byteregs[b&0x03];
-  *byteregs[b&0x03]=*byteregs[(b&0x30)>>4];
-  *byteregs[(b&0x30)>>4]=w;
+  f=*byteregs[(b&0x70)>>4] | 0xff00;
  } else {
-  w=*wordregs[b&0x07];
-  *wordregs[b&0x07]=*wordregs[(b&0x70)>>4];
-  *wordregs[(b&0x70)>>4]=w;
+  f=*wordregs[(b>>4)&0x07];
+ }
+ if(b&0x8) {
+  t=*byteregs[b&0x07] | 0xff00;
+ } else {
+  t=*wordregs[b&0x07];
+ }
+ if(b&0x80) {
+  *byteregs[(b&0x70)>>4] = t;
+  fillreg=0xff;  // keep fillvalue
+ } else {
+  *wordregs[(b>>4)&0x07] = t;
+  wfillreg = 0xffff;  // keep fillvalue
+ }
+ if(b&0x8) {
+  *byteregs[b&0x07] = f;
+  fillreg=0xff;  // keep fillvalue
+ } else {
+  *wordregs[b&0x07] = f;
+  wfillreg = 0xffff;  // keep fillvalue
  }
 }
 
@@ -1121,11 +1173,11 @@ int bit_count(Byte b)
   char *reg[] = { "pc", "u", "y", "x", "dp", "b", "a", "cc" };
 
   for(i=0; i<=7; i++) {
-	if (b & mask) {
-		count++;
-		da_ops(count > 1 ? ",":"", reg[i],1+(i<4?1:0));
-	}
-	mask >>= 1;
+        if (b & mask) {
+                count++;
+                da_ops(count > 1 ? ",":"", reg[i],1+(i<4?1:0));
+        }
+        mask >>= 1;
   }
   return count;
 }
@@ -1218,14 +1270,18 @@ subd()
 {
  unsigned long aop,bop,res;
  Word ea;
- if (iflag) da_inst("cmpu",NULL,5);
+ if (iflag) da_inst("cmpd",NULL,5);
  else da_inst("subd",NULL,5);
- if(iflag==2)aop=ureg; else aop=*dreg & 0xffff;
+ if(iflag==2) {
+        aop=ureg;
+        da_inst("cmpu",NULL,5);
+ }
+ else aop=*dreg & 0xffff;
  ea=eaddr16();
  bop=GETWORD(ea);
  res=aop-bop;
  SETSTATUSD(aop,bop,res)
- if(iflag==0) *dreg=res;
+ if(iflag==0) *dreg=res; /* subd result */
 }
 
 cmpx()
@@ -1234,16 +1290,16 @@ cmpx()
  Word ea;
  switch(iflag) {
   case 0:
- 	da_inst("cmpx",NULL,5);
-	aop=xreg;
-	break;
+        da_inst("cmpx",NULL,5);
+        aop=xreg;
+        break;
   case 1:
- 	da_inst("cmpy",NULL,5);
-	aop=yreg;
-	break;
+        da_inst("cmpy",NULL,5);
+        aop=yreg;
+        break;
   case 2:
- 	da_inst("cmps",NULL,5);
-	aop=sreg;
+        da_inst("cmps",NULL,5);
+        aop=sreg;
  }
  ea=eaddr16();
  bop=GETWORD(ea);
@@ -1372,21 +1428,21 @@ dump()
 
 char *to_bin(Byte b)
 {
- 	static char binstr[9];
-	Byte bm;
-	char *ccbit="EFHINZVC";
-	int i;
+        static char binstr[9];
+        Byte bm;
+        char *ccbit="EFHINZVC";
+        int i;
 
-	for(bm=0x80, i=0; bm>0; bm >>=1, i++)
-		binstr[i] = (b & bm) ? toupper(ccbit[i]) : tolower(ccbit[i]);
-	binstr[8] = 0;
-	return binstr;
+        for(bm=0x80, i=0; bm>0; bm >>=1, i++)
+                binstr[i] = (b & bm) ? toupper(ccbit[i]) : tolower(ccbit[i]);
+        binstr[8] = 0;
+        return binstr;
 }
 
 
 void cr() {
    #ifdef TERM_CONTROL
-   fprintf(stderr,"%s","\r\n");		/* CR+LF because raw terminal ... */
+   fprintf(stderr,"%s","\r\n");         /* CR+LF because raw terminal ... */
    #else
    fprintf(stderr,"%s","\n");
    #endif
@@ -1403,8 +1459,8 @@ void trace()
    int i;
 
   if (
-   1 ||						/* no trace filtering ... */
-   !(ureg > 0x09c0 && ureg < 0x09f3) && (	/* CMOVE ausblenden! */
+   1 ||                                         /* no trace filtering ... */
+   !(ureg > 0x09c0 && ureg < 0x09f3) && (       /* CMOVE ausblenden! */
     pcreg_prev == 0x01de || /* DOLST */
     pcreg_prev == 0x037a || /* FDOVAR */
   /*
@@ -1422,11 +1478,11 @@ void trace()
    fprintf(stderr,"%04x ",pcreg_prev);
    if (da_len) ilen = da_len;
    else {
-	ilen = pcreg-pcreg_prev; if (ilen < 0) ilen= -ilen;
+        ilen = pcreg-pcreg_prev; if (ilen < 0) ilen= -ilen;
    }
    for(i=0; i < I_MAX; i++) {
-	if (i < ilen) fprintf(stderr,"%02x",mem[(pcreg_prev+i)&0xffff]);
-	else fprintf(stderr,"  ");
+        if (i < ilen) fprintf(stderr,"%02x",mem[(pcreg_prev+i)&0xffff]);
+        else fprintf(stderr,"  ");
    }
    fprintf(stderr," %-5s %-17s [%02d] ", dinst, dops, cycles);
    //if((ireg&0xfe)==0x10)
@@ -1434,9 +1490,9 @@ void trace()
    fprintf(stderr,"x=%04x y=%04x u=%04x s=%04x a=%02x b=%02x cc=%s",
                    xreg,yreg,ureg,sreg,*areg,*breg,to_bin(ccreg));
    fprintf(stderr,", s: %04x %04x, r: %04x",
-	mem[sreg]<<8|mem[sreg+1],
-	mem[sreg+2]<<8|mem[sreg+3],
-	mem[yreg]<<8|mem[yreg+1]
+        mem[sreg]<<8|mem[sreg+1],
+        mem[sreg+2]<<8|mem[sreg+3],
+        mem[yreg]<<8|mem[yreg+1]
    );
    cr();
   }
@@ -1456,26 +1512,26 @@ main(int argc,char *argv[])
  /* initialize memory with pseudo random data ... */
  srandom(time(NULL));
  for(a=0x0100; a<0x10000;a++) {
-	mem[(Word)a] = (Byte) (random() & 0xff);
+        mem[(Word)a] = (Byte) (random() & 0xff);
  }
 
  while( (c=getopt(argc, argv, optstring)) >=0 ) {
-	switch(c) {
-	  case 'd':
-		fdump = 1;
-		break;
-	  default:
-		fprintf(stderr,"ERROR: Unknown option\n");
-		exit(2);
-	}
+        switch(c) {
+          case 'd':
+                fdump = 1;
+                break;
+          default:
+                fprintf(stderr,"ERROR: Unknown option\n");
+                exit(2);
+        }
  }
 
  if (optind < argc) {
    read_image(argv[optind]);
  }
  else {
-	fprintf(stderr,"ERROR: Missing image name\n");
-	exit(2);
+        fprintf(stderr,"ERROR: Missing image name\n");
+        exit(2);
  }
 
  pcreg=0x100;
@@ -1503,7 +1559,7 @@ main(int argc,char *argv[])
 
   ireg=mem[pcreg++];
   cycles=0;
-  (*instrtable[ireg])();		/* process instruction */
+  (*instrtable[ireg])();                /* process instruction */
   cycles_sum += cycles;
 
 #ifdef TRACE
