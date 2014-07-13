@@ -303,7 +303,7 @@ here    cmpx #here
         ldb #2
         mul
         lbeq error
-        lbcc error
+        lbcs error
         cmpd #256
         lbne error
         lda #0
@@ -316,7 +316,7 @@ here    cmpx #here
         lda #10
         ldb #20
         mul
-        lbcs error
+        lbcc error
         cmpd #200
         lbne error
         lda #100
