@@ -1235,35 +1235,67 @@ WITHI		jsr DOLST
 
 ;   U/		( udl udh un -- ur uq )
 ;		Unsigned divide of a double by a single. Return mod and quotient.
+;
+; Special cases:
+;       1. overflow: quotient overflow if dividend is to great (remainder = divisor),
+;               remainder is set to $FFFF -> special handling.
+;               This is checked also right before the main loop.
+;       2. underflow: divisor does not fit into dividend -> remainder
+;               get the value of the dividend -> automatically covered.
+;
+;   overflow:           quotient = $FFFF, remainder = divisor
+;   underflow:          quotient = $0000, remainder = dividend low
+;   division by zero:   quotient = $FFFF, remainder = $0000
+;
+; Testvalues:
+;
+; DIVH  DIVL    DVSR    QUOT    REM     comment
+;
+; 0100  0000    FFFF    0100    0100    maximum divisor
+; 0000  0001    8000    0000    0001    underflow (REM = DIVL)
+; 0000  5800    3000    0001    1800    normal divsion
+; 5800  0000    3000    FFFF    3000    overflow
+; 0000  0001    0000    FFFF    0000    overflow (division by zero)
 
 		FDB USLASH,L840
 L845		FCB 2,"U/"
-USLASH
+
+USLASH:
 		ldx #16
-		ldd 2,s		; udh
-		asl 5,s		; udl low
-		rol 4,s		; udl high
-UMMOD1:		rolb		; got one bit from udl
+		ldd 2,s         ; udh
+		cmpd ,s         ; dividend to great?
+		bhs UMMODOV     ; quotient overflow!
+		asl 5,s         ; udl low
+		rol 4,s         ; udl high
+
+UMMOD1:		rolb            ; got one bit from udl
 		rola
-		bcs UMMOD2 	; overflow -> divisor fits!
-		cmpd ,s		; divide by un
-		bhs UMMOD2	; higher or same as divisor?
-		clc
+		bcs UMMOD2      ; bit 16 means always greater as divisor
+		cmpd ,s         ; divide by un
+		bhs UMMOD2      ; higher or same as divisor?
+		andcc #$fe      ; clc - clear carry flag
 		bra UMMOD3
 UMMOD2:		subd ,s
-		sec
-UMMOD3:		rol 5,s		; udl, quotient shifted in
+		orcc #$01       ; sec - set carry flag
+UMMOD3:		rol 5,s         ; udl, quotient shifted in
 		rol 4,s
 		leax -1,x
 		bne UMMOD1
-		ldx 4,s		; quotient
-		cmpd ,s		; remainder >= divisor -> overflow
+
+		ldx 4,s         ; quotient
+		cmpd ,s         ; remainder >= divisor -> overflow
 		blo UMMOD4
-UMMODOV:	ldd #-1		; remainder = -1 (overflow)
-UMMOD4:		leas 2,s	; un (divisor thrown away)
-		stx ,s		; to TOS
-		std 2,s		; remainder 2nd
-		pulu pc		; next
+UMMODOV:
+		ldd ,s          ; remainder set to divisor
+		ldx #$FFFF      ; quotient = FFFF (-1) marks overflow
+                                ; (case 1)
+UMMOD4:         
+		leas 2,s        ; un (divisor thrown away)
+		stx ,s          ; quotient to TOS
+		std 2,s         ; remainder 2nd
+
+	        pulu pc         ; NEXT
+
 
 ;   UM/MOD	( udl udh un -- ur uq )
 ;		Unsigned divide of a double by a single. Return mod and quotient.
