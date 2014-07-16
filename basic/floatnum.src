@@ -1,0 +1,57 @@
+* Simple constants.
+fpzero
+0
+fpone
+1
+fptwo
+2
+fpten
+10
+fphalf
+0.5
+* Numbers used in conversion.
+fplolim
+99999999.95
+fphilim
+999999999.5
+* Mathematical constants.
+fpi
+3.1415926535898
+fln2
+0.6931471805599
+* Even coefficients for the sin(x)/x polynumial.
+sincoeff 
+-0.0000000239
+ 0.0000027526
+-0.0001984090
+ 0.0083333315
+-0.1666666664
+* Even coefficients for the arctan(x)/x polynomial.
+atancoeff
+ 0.0028662257
+-0.0161657367
+ 0.0429096138
+-0.0752896400
+ 0.1065626393
+-0.1420889944
+ 0.1999355085
+-0.3333314528
+* Coefficients for the exp(-x) polynomial.
+expcoeff
+-0.0001413161
+ 0.0013298820
+-0.0083013598
+ 0.0416573475
+-0.1666653019
+ 0.4999999206
+-0.9999999995
+* Coefficients for the ln(1+x) polynomial.
+lncoeff
+-0.0064535442
+ 0.0360884937
+-0.0953293897
+ 0.1676540711
+-0.2407338084
+ 0.3317990258
+-0.4998741238
+ 0.9999964239

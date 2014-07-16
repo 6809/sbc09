@@ -9,20 +9,30 @@ license: GNU General Public License version 2, see LICENSE for more details.
 
 
 Forum thread: http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=8&t=4880
+Project: https://github.com/6809/sbc09
 
 
-The first file of this shell archive contains C source, the second part
-conttains example programs that can be run on the simulator.
+For the usage of the assembler a09 and 6809 single board system v09 
+read doc/sbc09.creole!
 
 
-Usage of a09 and v09 read /doc/sbc09.creole !
+This distribution includes two different kinds of simulators:
+ 1. The old sim6809 based "simple" simulator built as v09s, v09st
+ 2. The 6809 single board system as a stand alone environment built as v09
 
 
 
-a09.c the 6809 assembler. It's fairly portable (ansi) C. It works on both
+Structure
+---------
+
+src/
+  Source for the developement tools and virtual machines ...
+
+  a09.c
+      The 6809 assembler. It's fairly portable (ANSI) C. It works on both
       Unix and DOS (TC2.0).
 
-      Features of the assembler.
+      Features of the assembler:
       - generates binary file starting at  the first address
         where code is actually generated. So an initial block of RMB's
         (maybe at a different ORG) is not included in the file.
@@ -32,26 +42,67 @@ a09.c the 6809 assembler. It's fairly portable (ansi) C. It works on both
         implemented. Some provisions are already made internally for macros
         and/or relocatable objects.
 
-V09.c  the 6809 simulator. Loads a binary image (from a09) at adress $100
-       and starts executing. SWI2 and SWI3 are for character output/input.
-       SYNC stops simulation. When compiling set -DBIG_ENDIAN if your
-       computer is big-endian. Set TERM_CONTROL for a crude single character
-       (instead of ANSI line-by-line) input. Works on Unix.
-v09tc.c same for Turbo C. Has its own term control.
+  v09s.c
+      The (old) 6809 simulator. Loads a binary image (from a09) at adress $100
+      and starts executing. SWI2 and SWI3 are for character output/input.
+      SYNC stops simulation. When compiling set -DBIG_ENDIAN if your
+      computer is big-endian. Set TERM_CONTROL for a crude single character
+      (instead of ANSI line-by-line) input. Works on Unix.
 
-test09.asm and bench09.asm simple test and benchmark progs.
+  v09stc.c
+      Same as v09s.c but for Turbo C. Has its own term control.
 
-ef09.asm Implementation of E-Forth, a very rudimentary and portable Forth.
+  v09.c
+  engine.c
+  io.c
+      The 6809 single board simulator/emulator v09.
+       
+  mon2.asm
+      Monitor progam, alternative version of monitor.asm
+      (used in ROM image alt09.rom)
+
+  monitor.asm
+      Monitor progam (used in ROM image v09.rom for v09)
+
+  makerom.c
+      Helper tool to generate ROM images for v09.
+
+
+basic/
+  Basic interpreters ...
+
+  basic.asm
+      Tiny Basic
+  fbasic.asm
+      Tiny Basic with Lennarts floating point routines.
+
+
+doc/
+  Documentation ...
+
+
+examples/
+  Several test and benchmark programs, simple routines and some bigger stuff
+  like a Forth system (ef09).
+
+  ef09.asm Implementation of E-Forth, a very rudimentary and portable Forth.
       Type WORDS to see what words you have. You can evaluate RPN integer
       expressions, like "12 34 + 5 * . " You can make new words like
       " : SQUARED DUP * ; " etc.
 
 
+examples_forth/
+  Forth environment with examples.
+  For the 6809 single board system.
 
 
-Running on Fedora Core 6
-------------------------
+
+
+Notes on Linux Fedora Core 6
+----------------------------
 2012-06-04
+
+Compiling v09s, v09st:
 
  * BIG_ENDIAN (already used by LINUX itself, changed to CPU_BIG_ENDIAN)
    Now automatically set according to BIG_ENDIAN and BYTE_ORDER
@@ -63,6 +114,7 @@ Running on Fedora Core 6
  * A tracefilter based on register values can be placed in the TRACE area to
    get tracing output triggered by special states 
    
+
 
 a09 Assembler
 -------------
@@ -82,8 +134,8 @@ Extended version:
 
 
 
-v09* Simulator
---------------
+v09s* Simulator
+---------------
 
 ### CC register
 
@@ -117,26 +169,24 @@ H is set on VCC but not on real 6809, sim6809 does what?
 
 
 ### start program
-v09 BINARY
+v09s BINARY
 
 ### start program with tracing output on STDOUT
-v09t BINARY
+v09st BINARY
 
 ### run program and leave memory dump (64k)
 
 # memory dump in file dump.v09
-v09 -d BINARY 
+v09s -d BINARY 
 
 
 
 ### Bugfixes
 
-* static int index;
-  otherwise the global C library function index() is referenced!
-  Write access on it leads to a core dump.
+ * static int index;
+   otherwise the global C library function index() is referenced!
+   Write access on it leads to a core dump.
 
- * com with C-operator ~WERT instead 0^WERT ...
-   Already fixed in 1994 edition.
  * BIG_ENDIAN is not useable in FLAG because (POSIX?) Unix
    (especially Linux) defines its byte order.
    If BIG_ENDIAN == BYTE_ORDER -> architecture is big endian!
@@ -151,22 +201,29 @@ v09 -d BINARY
 eForth
 ------
 
-ef09.asm:
+Source:
 
-Backspace character changed from 127 to 8.
+    ef09.asm
+
+    Backspace character changed from 127 to 8.
 
 
 Memory-Layout:
 
- 0100   At this address the binary is placed to, the Forth entry point
- 03C0   USER area start
- 4000   Memory TOP
+    0100   At this address the binary is placed to, the Forth entry point
+    03C0   USER area start
+    4000   Memory TOP
 
 
 I/O:
     Keyboard input:
      * ^H or BSP deletes character
      * RETURN -> interrupts (long) output
+
+Start:
+
+    ../v09s ef09
+
 
 Bugs:
     SEE     ;
@@ -175,9 +232,9 @@ Bugs:
 
 Typical commands:
 
- Command alway in upper case!!!
+ Commands alway in upper case!!!
 
-WORD        list of defined words of the current vocabulary
+WORD    list of defined words of the current vocabulary
 
 BYE     exit Forth (back to shell)
 DUMP        hex memory dump 
@@ -263,9 +320,9 @@ Extensions:
     SEE     SEE     ABORT", (DO) added, remarks corrected.
 
 TODO:
- * XXX marked  open points
- * SEE:
-  * handling of
+ * XXX marks points to open issues.
+ * SEE command:
+   handling of
     - [COMPILE]
     - DOCONST, DOVAR, DOUSE
 
@@ -291,6 +348,10 @@ FFFF FFFE FFFF U/ . . FFFF FFFE ok
 Links/References
 ================
 
+
+Project:
+  https://github.com/6809/sbc09
+  Maintained by the original author and others.
 
 Source:
   http://groups.google.com/group/alt.sources/browse_thread/thread/8bfd60536ec34387/94a7cce3fdc5df67

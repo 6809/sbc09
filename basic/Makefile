@@ -2,7 +2,6 @@
 # Makefile examples SBC09/Sim6809
 #
 # created 1994 by L.C. Benschop
-# 2013-10-28 - Jens Diemer: add "clean" section
 # 2014-06-25 - J.E. Klasek
 #
 # copyleft (c) 1994-2014 by the sbc09 team, see AUTHORS for more details.
@@ -11,11 +10,12 @@
 
 ASM=../a09
 
-EXAMPLES=asmtest bench09 bin2dec cond09 crc16 crc32 ef09 erat-sieve input printval test09 uslash
+PROGS=basic fbasic
+
+OTHER=floatnum.inc makeflot
 
 
-
-all: $(ASM) $(EXAMPLES)
+all: $(ASM) $(PROGS)
 
 $(ASM):
 	$(MAKE) -c ../src a09 install
@@ -30,36 +30,23 @@ $(ASM):
 
 # ------------------------------------
 
-asmtest: asmtest.asm
+basic: basic.asm
 
-bench09: bench09.asm
 
-bin2dec: bin2dec.asm
+fbasic: fbasic.asm floatnum.inc
+	$(ASM) -l $@.lst fbasic.asm
 
-cond09: cond09.asm
+floatnum.inc: floatnum.src makeflot
+	./makeflot < floatnum.src > floatnum.inc
 
-crc16: crc16.asm
-
-crc32: crc32.asm
-
-ef09: ef09.asm
-
-erat-sieve: erat-sieve.asm
-
-printval: printval.asm
-
-input: input.asm
-
-test09: test09.asm
-
-uslash: uslash.asm
-
+makeflot: makeflot.c
 
 
 # ------------------------------------
 
 cleanall: clean
+	rm -f $(PROGS) $(OTHER)
 
 clean:
-	rm -f core *.BAK *.lst $(EXAMPLES)
+	rm -f core *.BAK *.lst $(PROGS)
 

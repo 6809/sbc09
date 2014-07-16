@@ -33,6 +33,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 
 #ifdef USE_TERMIOS
 #include <termios.h>

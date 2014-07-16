@@ -3,6 +3,7 @@
    created 1993,1994 by L.C. Benschop.
    copyleft (c) 1994-2014 by the sbc09 team, see AUTHORS for more details.
    license: GNU General Public License version 2, see LICENSE for more details.
+   THERE IS NO WARRANTY ON THIS PROGRAM. 
 
    Generates binary image file from the lowest to
    the highest address with actually assembled data.
@@ -16,6 +17,7 @@
 
    Options
    -o filename name of the output file (default name minus a09 suffix)
+   -s filename name of the s-record output file (default its a binary file)
    -l filename list file name (default no listing)
    -d enable debugging
 
@@ -26,16 +28,21 @@
     fcb fcw fdb fcc rmb
     end include title
 
+   Not all of these are actually IMPLEMENTED!!!!!! 
+
    Revisions:
+	1993-11-03 v0.1 
+		Initial version.
+	1994/03/21 v0.2
+		Fixed PC relative addressing bug
+		Added SET, SETDP, INCLUDE. IF/ELSE/ENDIF
+		No macros yet, and no separate linkable modules.
 	2012-06-04 j at klasek at
-		Fixed: parsing register indexed modes/operands
 		New: debugging parameter/option.
-	2012-06-18 j at klasek at
-		Fixed: pshu opcode
-	2012-06-22 j at klasek at
-		Fixed: backported:
-			doaddress() opcode and offset handling from 1994 version
-			pass 2 error output
+		Fixed additional possible issue PC relative addressing.
+		Compatibility: Octal number prefix "&".
+	2014-07-15 j at klasek at
+		Fixed usage message.
 */
 
 #include <stdlib.h>
@@ -237,7 +244,7 @@ struct regrecord regtable[]=
                  {{"D",0x00,0x06},{"X",0x01,0x10},{"Y",0x02,0x20},
                   {"U",0x03,0x40},{"S",0x04,0x40},{"PC",0x05,0x80},
                   {"A",0x08,0x02},{"B",0x09,0x04},{"CC",0x0a,0x01},
-                  {"CCR",0x0a,0x01},{"DP",0x0b,0x03},{"DPR",0x0b,0x03}};
+                  {"CCR",0x0a,0x01},{"DP",0x0b,0x08},{"DPR",0x0b,0x08}};
 
 struct regrecord * findreg(char *nm)
 {
@@ -404,7 +411,8 @@ short scanfactor()
   case '*' : srcptr++;exprcat|=2;return loccounter;
   case '$' : return scanhex();
   case '%' : return scanbin();
-  case '&' : return scanoct();
+  case '&' : /* compatibility */
+  case '@' : return scanoct();
   case '\'' : return scanchar();
   case '(' : srcptr++;t=scanexpr(0);skipspace();
              if(*srcptr==')')srcptr++;else error|=1;
@@ -618,7 +626,6 @@ scanindexed()
     }
   }
   mode++;postbyte+=0x8c;
-  if(opsize==0)if(unknown||!certain)opsize=3;else opsize=2;
   if(opsize==1)opsize=2;
  }
 }
@@ -648,8 +655,7 @@ scanoperands()
   if(*srcptr!=',')RESTORE else {
      postbyte=0x8b;
      srcptr++;
-     if(!scanindexreg())RESTORE else set3();
-     srcptr++;
+     if(!scanindexreg())RESTORE else {srcptr++;set3();}
   }
   break;
  case 'A': case 'a':
@@ -659,8 +665,7 @@ scanoperands()
   if(*srcptr!=',')RESTORE else {
      postbyte=0x86;
      srcptr++;
-     if(!scanindexreg())RESTORE else set3();
-     srcptr++;
+     if(!scanindexreg())RESTORE else {srcptr++;set3();}
   }
   break;
  case 'B': case 'b':
@@ -671,8 +676,7 @@ scanoperands()
      postbyte=0x85;
      srcptr++;
      if (debug) fprintf(stderr,"DEBUG: scanoperands: breg preindex: c=%c (%02X)\n",*srcptr,*srcptr);
-     if(!scanindexreg())RESTORE else set3();
-     srcptr++;
+     if(!scanindexreg())RESTORE else {srcptr++;set3();}
      if (debug) fprintf(stderr,"DEBUG: scanoperands: breg: postindex c=%c (%02X)\n",*srcptr,*srcptr);
   }
   break;
@@ -724,12 +728,43 @@ scanoperands()
 }
 
 unsigned char codebuf[128];
-int codeptr;
+int codeptr; /* byte offset within instruction */
+int suppress; /* 0=no suppress 1=until ENDIF 2=until ELSE 3=until ENDM */
+int ifcount;  /* count of nested IFs within suppressed text */
+
+unsigned char outmode; /* 0 is binary, 1 is s-records */
+
+unsigned short hexaddr;
+int hexcount;
+unsigned char hexbuffer[16];
+unsigned int chksum;
+
+flushhex()
+{
+ int i;
+ if(hexcount){
+  fprintf(objfile,"S1%02X%04X",(hexcount+3)&0xff,hexaddr&0xffff);
+  for(i=0;i<hexcount;i++)fprintf(objfile,"%02X",hexbuffer[i]);
+  chksum+=(hexaddr&0xff)+((hexaddr>>8)&0xff)+hexcount+3;
+  fprintf(objfile,"%02X\n",0xff-(chksum&0xff));
+  hexaddr+=hexcount;
+  hexcount=0;
+  chksum=0;
+ }
+}
+
+outhex(unsigned char x) 
+{
+ if(hexcount==16)flushhex();
+ hexbuffer[hexcount++]=x;
+ chksum+=x;
+}
 
 outbuffer()
 {
  int i;
- for(i=0;i<codeptr;i++)fputc(codebuf[i],objfile);
+ for(i=0;i<codeptr;i++)
+   if(!outmode)fputc(codebuf[i],objfile);else outhex(codebuf[i]);
 }
 
 char *errormsg[]={"Error in expression",
@@ -804,12 +839,14 @@ doaddress() /* assemble the right addressing bytes for an instruction */
     }
     break;
  case 4: case 6: offs=(unsigned short)operand-loccounter-codeptr-2;
-                if(offs<-128||offs>=128||opsize==3) {
+                if(offs<-128||offs>=128||opsize==3||unknown||!certain) {
                  if((!unknown)&&opsize==2)error|=16;
                  offs--;
+                 opsize=3;
                  postbyte++;
                 }
                 putbyte(postbyte);
+ 		if (debug) fprintf(stderr,"DEBUG: doaddress: mode=%d, opsize=%d, error=%d, postbyte=%02X, operand=%04X offs=%d\n",mode,opsize,error,postbyte,operand,offs);
                 if(opsize==3)putword(offs);
                 else putbyte(offs);
  }
@@ -918,7 +955,7 @@ oneaddr(int co)
  case 0: error|=2;break;
  case 1: putbyte(co);break;
  case 2: putbyte(co+0x70);break;
- case 3: putbyte(co+0x60);break;
+ default: putbyte(co+0x60);break;
  }
  doaddress();
 }
@@ -960,22 +997,27 @@ pseudoop(int co,struct symrecord * lp)
 {
  int i;
  char c;
+ char fname[FNLEN+1];
  switch(co) {
  case 0:/* RMB */
         setlabel(lp);
         operand=scanexpr(0);
         if(unknown)error|=4;
         loccounter+=operand;
-        if(generating&&pass==2)for(i=0;i<operand;i++)
-                     fputc(0,objfile);
+        if(generating&&pass==2) {
+           if(!outmode)for(i=0;i<operand;i++)fputc(0,objfile);
+           else flushhex();  
+        }   
+        hexaddr=loccounter;
         break;
  case 5:/* EQU */
         operand=scanexpr(0);
         if(!lp)error|=32;
         else {
-         if(lp->cat==13||lp->cat==6||pass==2) {
+         if(lp->cat==13||lp->cat==6||
+            (lp->value==(unsigned short)operand&&pass==2)) {
           if(exprcat==2)lp->cat=2;
-          else lp->cat=1;
+          else lp->cat=0;
           lp->value=operand;
          } else error|=8;
         }
@@ -1017,12 +1059,57 @@ pseudoop(int co,struct symrecord * lp)
          skipspace();
         } while(*srcptr==',');
         break;
+ case 1: /* ELSE */
+        suppress=1;
+        break;
+ case 10: /* IF */
+        operand=scanexpr(0);
+        if(unknown)error|=4;
+        if(!operand)suppress=2;
+        break;                
  case 12: /* ORG */
          operand=scanexpr(0);
          if(unknown)error|=4;
-         if(generating&&pass==2)for(i=0;i<(unsigned short)operand-loccounter;i++)
-                      fputc(0,objfile);
+         if(generating&&pass==2) {
+           for(i=0;i<(unsigned short)operand-loccounter;i++)
+                if(!outmode)fputc(0,objfile);else flushhex();
+         }             
          loccounter=operand;
+         hexaddr=loccounter;
+         break;
+  case 14: /* SETDP */
+         operand=scanexpr(0);
+         if(unknown)error|=4;
+         if(!(operand&255))operand=(unsigned short)operand>>8;
+         if((unsigned)operand>255)operand=-1;
+         dpsetting=operand;              
+         break;
+  case 15: /* SET */
+        operand=scanexpr(0);
+        if(!lp)error|=32;
+        else {
+         if(lp->cat&1||lp->cat==6) {
+          if(exprcat==2)lp->cat=3;
+          else lp->cat=1;
+          lp->value=operand;
+         } else error|=8;
+        }
+        break;
+   case 2: /* END */
+   	terminate=1;
+   	break;     
+   case 16: /* INCLUDE */     
+        skipspace();
+        if(*srcptr=='"')srcptr++;
+        for(i=0;i<FNLEN;i++) {
+          if(*srcptr==0||*srcptr=='"')break;
+          fname[i]=*srcptr++;
+        }
+        fname[i]=0;
+        processfile(fname);
+        codeptr=0;
+        srcline[0]=0;
+        break; 
  }
 }
 
@@ -1083,9 +1170,32 @@ processline()
  loccounter+=codeptr;
 }
 
+suppressline()
+{
+ struct oprecord * op;
+ srcptr=srcline;
+ oldlc=loccounter;
+ codeptr=0;
+ if(isalnum(*srcptr)) {
+  scanname();
+  if(*srcptr==':')srcptr++;
+ }
+ skipspace();
+ scanname();op=findop(namebuf);
+ if(op && op->cat==13) {
+  if(op->code==10) ifcount++;
+  else if(op->code==3) {
+   if(ifcount>0)ifcount--;else if(suppress==1|suppress==2)suppress=0;
+  } else if(op->code==1) {
+   if(ifcount==0 && suppress==2)suppress=0;
+  }
+ }  
+ if(pass==2&&listing)outlist();
+}
+
 usage(char*nm)
 {
-  fprintf(stderr,"Usage: %s [-d] [-o objname] [-l listname] srcname\n",nm);
+  fprintf(stderr,"Usage: %s [-o objname] [-l listname] [-s srecord-file] srcname\n",nm);
   exit(2);
 }
 
@@ -1101,6 +1211,12 @@ getoptions(int c,char*v[])
  if(strcmp(v[1],"-o")==0) {
    if(c<4)usage(v[0]);
    strcpy(objname,v[2]);
+   i+=2;
+ }
+ if(strcmp(v[i+1],"-s")==0) {
+   if(c<4+i)usage(v[0]);
+   strcpy(objname,v[i+2]);
+   outmode=1;
    i+=2;
  }
  if(strcmp(v[i+1],"-l")==0) {
@@ -1153,9 +1269,14 @@ processfile(char *name)
    expandline();
    lineno++;
    srcptr=srcline;
-   processline();
+   if(suppress)suppressline(); else processline();
  }
  fclose(srcfile);
+ if(suppress) {
+   fprintf(stderr,"improperly nested IF statements in %s",curname);
+   errors++;
+   suppress=0;
+ }
  lineno=oldno;
  strcpy(curname,oldname);
 }
@@ -1183,7 +1304,7 @@ main(int argc,char *argv[])
   fprintf(stderr,"Cannot open list file");
   exit(4);
  }
- if((objfile=fopen(objname,"wb"))==0) {
+ if((objfile=fopen(objname,outmode?"w":"wb"))==0) {
   fprintf(stderr,"Cannot write object file\n");
   exit(4);
  }
@@ -1194,6 +1315,10 @@ main(int argc,char *argv[])
   outsymtable();
   fclose(listfile);
  }
+ if(outmode){
+  flushhex();
+  fprintf(objfile,"S9030000FC\n");
+ } 
  fclose(objfile);
 }
 
