@@ -1,5 +1,12 @@
 	;FBASIC, Floating point BASIC.
 
+	;This is not a BASIC interpreter, but a simple RPN calculator
+	;to test the floating point routines. As such it is not a finished
+	;application.
+	;Written in 1996 by Lennart Benschoo.
+	;
+	;2014-07-26: Added welcome message, a few more comments.
+	
 		;Configuration info, change this for different apps.
 ROM		equ 0		;Flag to indicate that BASIC is in ROM
 ROMSTART	equ $8000	;First ROM address.
@@ -63,46 +70,54 @@ docold		ldx #RAMTOP
 		ldx #PROGEND
 		stx startprog
 		jmp dorun
-noboot		jsr doclear				
+noboot		jsr doclear
+	;; Print a welcome message first.
+		ldx #nbmesg
+		ldb #nbmend-nbmesg
+		jsr putline
+		jsr putcr
 		ldd #$4000
 		std fpsp
 		ldu fpsp
+	;; Main loop. This is a simple RPN calculator that treat
 nbloop		ldx #$5000
 		ldb #20
 		jsr getline
 		clr b,x
 		cmpb #1
-		lbne donum
+		lbne donum	; All commands are single-character, everything
+	; else is treated as a number. Also the single-character lines that
+	; are not commands are later parsed as numbers.
 		ldb ,x
-		cmpb #'+'
+		cmpb #'+'	; Add
 		bne nb1
 		jsr fpadd
 		lbra doprint
-nb1		cmpb #'-'	
+nb1		cmpb #'-'	; Subtract
 		bne nb2
 		jsr fpsub
 		lbra doprint
-nb2		cmpb #'*'
+nb2		cmpb #'*'	; Multiply
 		bne nb3	
 		jsr fpmul
 		lbra doprint
-nb3		cmpb #'/'
+nb3		cmpb #'/'	; Divide
 		bne nb4
 		jsr fpdiv
 		lbra doprint		
-nb4		cmpb #'q'
+nb4		cmpb #'q'	; Square root.
 		bne nb5
 		jsr fpsqrt
 		lbra doprint
-nb5		cmpb #'i'
+nb5		cmpb #'i'	; Round to -Inf INT() in BASIC.
 		bne nb6
 		jsr fpfloor
 		lbra doprint
-nb6		cmpb #'s'
+nb6		cmpb #'s'	; SIN() function
 		bne nb7
 		jsr fpsin
 		lbra doprint
-nb7		cmpb #'='
+nb7		cmpb #'='	; Compare top two numbers Show < = or >
 		bne nb8
 		jsr fpcmp
 		beq nbeq
@@ -111,42 +126,42 @@ nb7		cmpb #'='
 		bra nbcmp
 nbeq		ldb #'='
 		bra nbcmp
-nbgt		ldb #'>'
+nbgt		ldb #'>'	
 nbcmp		leau -10,u
 		jsr putchar
 		jsr putcr
 		bra nbloop
-nb8		cmpb #'c'
+nb8		cmpb #'c'	; COS() function.
 		bne nb9
 		jsr fpcos
 		bra doprint
-nb9		cmpb #'t'
+nb9		cmpb #'t'	; TAN() function.
 		bne nb10
 		jsr fptan
 		bra doprint
-nb10		cmpb #'a'
+nb10		cmpb #'a'  	; ATAN() function.
 		bne nb11
 		jsr fpatan
 		bra doprint
-nb11		cmpb #'e'
+nb11		cmpb #'e'	; EXP() function.
 		bne nb12
 		jsr fpexp
 		bra doprint
-nb12		cmpb #'l'
+nb12		cmpb #'l'	; LN() function.
 		bne nb13
 		jsr fln
 		bra doprint
-nb13		cmpb #'d'
+nb13		cmpb #'d'	; Duplicate top number on stack.
 		bne nb14
 		jsr fpdup
-		bra doprint
+		bra doprint  	; Exchange top two numbers on stack.
 nb14		cmpb #'x'
 		bne nb15
 		jsr fpexg
 		bra doprint
-nb15		cmpb #'r'
+nb15		cmpb #'r'  	; Drop top from stack.
 		bne nb16
-		leau 5,u
+		leau -5,u
 		bra doprint
 nb16
 donum		ldy #$5000
@@ -160,7 +175,9 @@ doprint		ldy #$5000
 		jsr putline
 		jsr putcr
 		lbra nbloop
-		
+nbmesg		fcc "Welcome to RPN calculator"
+nbmend		
+	
 doclear 	rts
 dorun		swi
 makefree	rts		
