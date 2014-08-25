@@ -286,7 +286,7 @@ Word nnpcr()
  char off[11];
 
  IMMWORD(w)
- sprintf(off,"$%04x,pcr",pcreg+w);
+ sprintf(off,"$%04x,pcr",(pcreg+w)&0xffff);
  da_ops(off,NULL,5);
  return pcreg+w;
 }
@@ -584,12 +584,15 @@ jsr()
 bsr()
 {
  Byte b;
-
+ char off[6];
+ 
  IMMBYTE(b)
  da_inst("bsr",NULL,7);
  da_len = 2;
  PUSHWORD(pcreg)
  pcreg+=SIGNED(b);
+ sprintf(off,"$%04x", pcreg&0xffff);
+ da_ops(off,NULL,0);
 }
 
 neg()
