@@ -49,7 +49,8 @@
         2014-07-11 JK
                 Fixed: undocumented tfr/exg register combinations.
                         http://www.6809.org.uk/dragon/illegal-opcodes.shtml
-
+        2016-10-06 JK
+                Fixed: wrong cmpu cycles
 */
 
 #include <stdio.h>
@@ -1273,13 +1274,19 @@ subd()
 {
  unsigned long aop,bop,res;
  Word ea;
- if (iflag) da_inst("cmpd",NULL,5);
- else da_inst("subd",NULL,5);
- if(iflag==2) {
-        aop=ureg;
+ aop=*dreg & 0xffff;
+ switch(iflag) {
+  case 0:
+        da_inst("subd",NULL,5);
+        break;
+  case 1:
+        da_inst("cmpd",NULL,5);
+        aop=*dreg & 0xffff;
+        break;
+  case 2:
         da_inst("cmpu",NULL,5);
+        aop=ureg;
  }
- else aop=*dreg & 0xffff;
  ea=eaddr16();
  bop=GETWORD(ea);
  res=aop-bop;
