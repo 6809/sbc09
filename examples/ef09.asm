@@ -1,4 +1,4 @@
-     TITLE 6809 eForth
+     ;TITLE 6809 eForth
 
 ; $Id: ef09.asm,v 1.1 1997/11/24 02:56:01 root Exp $
 ;
@@ -98,6 +98,7 @@ NAMEE		EQU	EM-$0400		;name dictionary
 
 
 		ORG	COLDD			;beginning of cold boot area
+		SETDP   0
 
 ORIG		lds #SPP			;Init stack pointer.
 		ldy #RPP			;Init return stack pointer
@@ -135,7 +136,7 @@ UZERO		RMB     8			;reserved space in user area
 		FDB	CTOP			;CP
 		FDB	NTOP			;NP
 		FDB	LASTN			;LAST
-ULAST:
+ULAST
 
 		ORG	CODEE			;beginning of the code dictionary
 
@@ -243,7 +244,7 @@ next1		leay 2,y		; remove counter from stack
 
 		FDB QBRAN,L160
 L170		FCB COMPO+7,"?branch"
-QBRAN		$CODE	COMPO+7,'?branch',QBRAN
+QBRAN		;$CODE	COMPO+7,'?branch',QBRAN
 		ldd ,s++
 		beq bran1
 		leau 2,u	; skip new IP, no branch
@@ -469,7 +470,7 @@ ZEQUAL
 		ldd ,s		; TOS
 		beq ZEQUAL1	; -> true
 		ldx #0		; false		
-ZEQUAL1:	stx ,s		; D: 0000 or FFFF (= -1)
+ZEQUAL1		stx ,s		; D: 0000 or FFFF (= -1)
 		pulu pc
 
 ;   AND		( w w -- w )
@@ -919,7 +920,7 @@ QDUP
 		FDB	DUPP
 		FDB	QBRAN,QDUP1
 		FDB	DUPP
-QDUP1:		FDB	EXIT
+QDUP1		FDB	EXIT
 
 ;   ROT		( w1 w2 w3 -- w2 w3 w1 )
 ;		Rot 3rd item to top.
@@ -951,37 +952,37 @@ DDUP
 ;   LSHIFT	( w n -- w )
 ;		Shift word left n times.
 		FDB LSHIFT,L720
-L721		FCB, 6,"LSHIFT"
+L721		FCB 6,"LSHIFT"
 LSHIFT		ldx ,s++	;shift count
 		beq LSHIFT2
 		ldd ,s		;value to shift
-LSHIFT1:	aslb		;low
+LSHIFT1		aslb		;low
 		rola		;high
 		leax -1,x	;count down
 		bne LSHIFT1
 		std ,s
-LSHIFT2:
+LSHIFT2
 		pulu pc
 
 ;   RSHIFT	( w n -- w )
 ;		Shift word right n times.
 		FDB RSHIFT,L721
-L721A		FCB, 6,"RSHIFT"
+L721A		FCB 6,"RSHIFT"
 RSHIFT		ldx ,s++	;shift count
 		beq RSHIFT2
 		ldd ,s		;value to shift
-RSHIFT1:	lsra		;high
+RSHIFT1 	lsra		;high
 		rorb		;low
 		leax -1,x	;count down
 		bne RSHIFT1
 		std ,s
-RSHIFT2:
+RSHIFT2
 		pulu pc
 
 ;   ><		( w -- w )
 ;		swap high and low byte
 		FDB SWAPHL,L721A
-L722		FCB, 2,"><"
+L722		FCB 2,"><"
 SWAPHL		ldb ,s		;high -> D low
 		lda 1,s		;low -> D high
 		std ,s
@@ -990,7 +991,7 @@ SWAPHL		ldb ,s		;high -> D low
 ;   256/		( w -- w )
 ;		multiply with 256 (shift left 8 times)
 		FDB SLASH256,L722
-L723		FCB, 4,"256/"
+L723		FCB 4,"256/"
 SLASH256	ldb ,s		;high -> D low
 		clra		;D high = 0
 		std ,s
@@ -999,7 +1000,7 @@ SLASH256	ldb ,s		;high -> D low
 ;   256*		( w -- w )
 ;		multiply with 256 (shift left 8 times)
 		FDB STAR256,L723
-L724		FCB, 4,"256*"
+L724		FCB 4,"256*"
 STAR256		lda 1,s		;low -> D high
 		clrb		;D low = 0
 		std ,s
@@ -1008,7 +1009,7 @@ STAR256		lda 1,s		;low -> D high
 ;   1+		( w -- w )
 ;		Shortcut, quick add 1
 		FDB PLUS1,L724
-L725		FCB, 2,"1+"
+L725		FCB 2,"1+"
 PLUS1		ldd ,s
 		addd #1
 		std ,s
@@ -1017,7 +1018,7 @@ PLUS1		ldd ,s
 ;   -+		( w -- w )
 ;		Shortcut, quick subtract 1
 		FDB MINUS1,L725
-L726		FCB, 2,"1-"
+L726		FCB 2,"1-"
 MINUS1		ldd ,s
 		subd #1
 		std ,s
@@ -1026,7 +1027,7 @@ MINUS1		ldd ,s
 ;   2*		( w -- w )
 ;		multiply by 2 using shift operation
 		FDB TWOSTAR,L726
-L727		FCB, 2,"2*"
+L727		FCB 2,"2*"
 TWOSTAR		asl 1,s		;low
 		rol 0,s		;high
 		pulu pc
@@ -1034,7 +1035,7 @@ TWOSTAR		asl 1,s		;low
 ;   2/		( w -- w )
 ;		divide by 2 using shift operation
 		FDB TWOSLASH,L727
-L728		FCB, 2,"2/"
+L728		FCB 2,"2/"
 TWOSLASH	asr 0,s		;high
 		ror 1,s		;low
 		pulu pc
@@ -1137,7 +1138,7 @@ ABSS		jsr DOLST
 		FDB	DUPP,ZLESS
 		FDB	QBRAN,ABS1
 		FDB	NEGAT
-ABS1:		FDB	EXIT
+ABS1		FDB	EXIT
 
 ;   =		( w w -- t )
 ;		Return true if top two are equal.
@@ -1150,7 +1151,7 @@ EQUAL
 		cmpd ,s		; compare to 2nd value
 		beq EQUAL1	; equal -> true
 		ldx #0		; false (leax 1,x save 1 byte, but is slower)
-EQUAL1:		stx ,s
+EQUAL1 		stx ,s
 		pulu pc
 ;;;; slow HL ...
 ;;;;		jsr DOLST
@@ -1170,7 +1171,7 @@ ULESS
 		cmpd ,s		; u2 - u1
 		bhi ULES1	; unsigned: u2 higher u1
 		ldx #0		; false
-ULES1:		stx ,s		; replace TOS with result
+ULES1		stx ,s		; replace TOS with result
 		pulu pc
 ;;;; slow HL ...
 ;;;;		jsr DOLST
@@ -1190,7 +1191,7 @@ LESS
 		cmpd ,s		; n2 - n1
 		bgt LESS1	; signed: n2 greater than n1
 		ldx #0		; false
-LESS1:		stx ,s		; replace TOS with result
+LESS1		stx ,s		; replace TOS with result
 		pulu pc
 		
 ;;;; slow HL ...
@@ -1209,7 +1210,7 @@ MAX		jsr DOLST
 		FDB	DDUP,LESS
 		FDB	QBRAN,MAX1
 		FDB	SWAP
-MAX1:		FDB	DROP,EXIT
+MAX1		FDB	DROP,EXIT
 
 ;   MIN		( n n -- n )
 ;		Return the smaller of top two stack items.
@@ -1220,7 +1221,7 @@ MIN		jsr DOLST
 		FDB	DDUP,SWAP,LESS
 		FDB	QBRAN,MIN1
 		FDB	SWAP
-MIN1:		FDB	DROP,EXIT
+MIN1		FDB	DROP,EXIT
 
 ;   WITHIN	( u ul uh -- t )
 ;		Return true if u is within the range of ul and uh. ( ul <= u < uh )
@@ -1260,7 +1261,7 @@ WITHI		jsr DOLST
 		FDB USLASH,L840
 L845		FCB 2,"U/"
 
-USLASH:
+USLASH
 		ldx #16
 		ldd 2,s         ; udh
 		cmpd ,s         ; dividend to great?
@@ -1268,16 +1269,16 @@ USLASH:
 		asl 5,s         ; udl low
 		rol 4,s         ; udl high
 
-UMMOD1:		rolb            ; got one bit from udl
+UMMOD1		rolb            ; got one bit from udl
 		rola
 		bcs UMMOD2      ; bit 16 means always greater as divisor
 		cmpd ,s         ; divide by un
 		bhs UMMOD2      ; higher or same as divisor?
 		andcc #$fe      ; clc - clear carry flag
 		bra UMMOD3
-UMMOD2:		subd ,s
+UMMOD2		subd ,s
 		orcc #$01       ; sec - set carry flag
-UMMOD3:		rol 5,s         ; udl, quotient shifted in
+UMMOD3		rol 5,s         ; udl, quotient shifted in
 		rol 4,s
 		leax -1,x
 		bne UMMOD1
@@ -1285,11 +1286,11 @@ UMMOD3:		rol 5,s         ; udl, quotient shifted in
 		ldx 4,s         ; quotient
 		cmpd ,s         ; remainder >= divisor -> overflow
 		blo UMMOD4
-UMMODOV:
+UMMODOV
 		ldd ,s          ; remainder set to divisor
 		ldx #$FFFF      ; quotient = FFFF (-1) marks overflow
                                 ; (case 1)
-UMMOD4:         
+UMMOD4         
 		leas 2,s        ; un (divisor thrown away)
 		stx ,s          ; quotient to TOS
 		std 2,s         ; remainder 2nd
@@ -1309,7 +1310,7 @@ UMMOD
 		FDB	DDUP,ULESS
 		FDB	QBRAN,UMM4
 		FDB	NEGAT,DOLIT,15,TOR
-UMM1:		FDB	TOR,DUPP,UPLUS
+UMM1		FDB	TOR,DUPP,UPLUS
 		FDB	TOR,TOR,DUPP,UPLUS
 		FDB	RFROM,PLUS,DUPP
 		FDB	RFROM,RAT,SWAP,TOR
@@ -1317,11 +1318,11 @@ UMM1:		FDB	TOR,DUPP,UPLUS
 		FDB	QBRAN,UMM2
 		FDB	TOR,DROP,PLUS1,RFROM
 		FDB	BRAN,UMM3
-UMM2:		FDB	DROP
-UMM3:		FDB	RFROM
+UMM2		FDB	DROP
+UMM3		FDB	RFROM
 		FDB	DONXT,UMM1
 		FDB	DROP,SWAP,EXIT
-UMM4:		FDB	DROP,DDROP
+UMM4		FDB	DROP,DDROP
 		FDB	DOLIT,-1,DUPP,EXIT
 
 ;   M/MOD	( d n -- r q )
@@ -1334,13 +1335,13 @@ MSMOD
 		FDB	DUPP,ZLESS,DUPP,TOR
 		FDB	QBRAN,MMOD1
 		FDB	NEGAT,TOR,DNEGA,RFROM
-MMOD1:		FDB	TOR,DUPP,ZLESS
+MMOD1		FDB	TOR,DUPP,ZLESS
 		FDB	QBRAN,MMOD2
 		FDB	RAT,PLUS
-MMOD2:		FDB	RFROM,UMMOD,RFROM
+MMOD2		FDB	RFROM,UMMOD,RFROM
 		FDB	QBRAN,MMOD3
 		FDB	SWAP,NEGAT,SWAP
-MMOD3:		FDB	EXIT
+MMOD3		FDB	EXIT
 
 ;   /MOD	( n n -- r q )
 ;		Signed divide. Return mod and quotient.
@@ -1379,11 +1380,11 @@ UMSTA
 		clra		; result high word
 		clrb
 		bra UUMSTA3
-UUMSTA1:	bcc UUMSTA2
+UUMSTA1		bcc UUMSTA2
 		addd ,s
-UUMSTA2:	rora		; high, result high word
+UUMSTA2 	rora		; high, result high word
 		rorb		; low, result high word
-UUMSTA3:	ror 2,s		; shift multiplier high, result low word
+UUMSTA3 	ror 2,s		; shift multiplier high, result low word
 		ror 3,s		; shift multiplier low, result low word
 		leax -1,x
 		bne UUMSTA1
@@ -1407,11 +1408,11 @@ L900A		FCB 4,"_UM*"
 UUMSTA
 		jsr DOLST
 		FDB	DOLIT,0,SWAP,DOLIT,15,TOR
-UMST1:		FDB	DUPP,UPLUS,TOR,TOR
+UMST1		FDB	DUPP,UPLUS,TOR,TOR
 		FDB	DUPP,UPLUS,RFROM,PLUS,RFROM
 		FDB	QBRAN,UMST2
 		FDB	TOR,OVER,UPLUS,RFROM,PLUS
-UMST2:		FDB	DONXT,UMST1
+UMST2		FDB	DONXT,UMST1
 		FDB	ROT,DROP,EXIT
 
 ;   *		( n n -- n )
@@ -1436,7 +1437,7 @@ MSTAR
 		FDB	RFROM
 		FDB	QBRAN,MSTA1
 		FDB	DNEGA
-MSTA1:		FDB	EXIT
+MSTA1		FDB	EXIT
 
 ;   */MOD	( n1 n2 n3 -- r q )
 ;		Multiply n1 and n2, then divide by n3. Return mod and quotient.
@@ -1517,7 +1518,7 @@ TCHAR		jsr DOLST
 		FDB	BLANK,WITHI	;check for printable
 		FDB	QBRAN,TCHA1
 		FDB	DROP,DOLIT,'_'		;replace non-printables
-TCHA1:		FDB	EXIT
+TCHA1		FDB	EXIT
 
 ;   DEPTH	( -- n )
 ;		Return the depth of the data stack.
@@ -1652,7 +1653,7 @@ ATEXE		jsr DOLST
 		FDB	AT,QDUP			;?address or zero
 		FDB	QBRAN,EXE1
 		FDB	EXECU			;execute if non-zero
-EXE1:		FDB	EXIT			;do nothing if zero
+EXE1		FDB	EXIT			;do nothing if zero
 
 ;   CMOVE	( b1 b2 u -- )
 ;		Copy u bytes from b1 to b2.
@@ -1666,18 +1667,18 @@ CMOVE
 		tstb		;count low
 		beq CMOVE1
 		inc ,s		;ajust high for to-0 decrementation
-CMOVE1:
+CMOVE1
 		ldx 2,s		;to addr
 		stu 2,s		;save reg on stack
 		ldu 4,s		;from addr
-CMOVE2:		lda ,u+		;from ->
+CMOVE2		lda ,u+		;from ->
 		sta ,x+		;to	
 		decb		;low count
 		bne CMOVE2
 		dec ,s		;high count
 		bne CMOVE2
 		ldu 2,s
-CMOVE3:		leas 6,s	;drop 3 parameters from stack
+CMOVE3		leas 6,s	;drop 3 parameters from stack
 		pulu pc
 ;;;;
 ;;;; alternative, wordwise copy ...
@@ -1691,19 +1692,19 @@ CMOVEW		ldd ,s		; count
 		pshs cc
 		beq CMOVEW1	; byte decrement correction
 		inca		; byte decrement high byte correction
-CMOVEW1:	subd #0		; word count zero (=65536)?
+CMOVEW1		subd #0		; word count zero (=65536)?
 		beq CMOVEW3
-CMOVEW2:	ldu ,y++	; source
+CMOVEW2		ldu ,y++	; source
 		stu ,x++	; destination
 		decb		; count low
 		bne CMOVEW2
 		deca		; count high (count to 0 corrected)
 		bne CMOVEW2
-CMOVEW3:	puls CC		; check if odd count?
+CMOVEW3 	puls CC		; check if odd count?
 		bcc CMOVEW4
 		lda ,y
 		sta ,x
-CMOVEW4:	puls y,u	; y first
+CMOVEW4 	puls y,u	; y first
 		leas 2,s	; drop 3rd parameter
 		pulu pc		; next
 ;;;;
@@ -1730,16 +1731,16 @@ FILL
 		tstb		;count low
 		beq NFILL1
 		inc 2,s		;ajust high for to-0 decrementation
-NFILL1:
+NFILL1
 		ldx 4,s		;to addr
 		lda 1,s		;fill byte, low byte from TOS
-NFILL2:		
+NFILL2		
 		sta ,x+		;to	
 		decb		;low count
 		bne NFILL2
 		dec 2,s		;high count
 		bne NFILL2
-NFILL3:		leas 6,s	;drop 3 parameters from stack
+NFILL3		leas 6,s	;drop 3 parameters from stack
 		pulu pc
 ;;;; slow HL ...
 ;;;;		jsr DOLST
@@ -1757,10 +1758,10 @@ L1120		FCB 9,"-TRAILING"
 DTRAI		jsr DOLST
 		FDB	TOR
 		FDB	BRAN,DTRA2
-DTRA1:		FDB	BLANK,OVER,RAT,PLUS,CAT,LESS
+DTRA1		FDB	BLANK,OVER,RAT,PLUS,CAT,LESS
 		FDB	QBRAN,DTRA2
 		FDB	RFROM,PLUS1,EXIT
-DTRA2:		FDB	DONXT,DTRA1
+DTRA2		FDB	DONXT,DTRA1
 		FDB	ZERO,EXIT
 
 ;   PACK$	( b u a -- a )
@@ -1833,10 +1834,10 @@ DIG		jsr DOLST
 		FDB DIGS,L1180
 L1190		FCB 2,"#S"
 DIGS		jsr DOLST
-DIGS1:		FDB	DIG,DUPP
+DIGS1		FDB	DIG,DUPP
 		FDB	QBRAN,DIGS2
 		FDB	BRAN,DIGS1
-DIGS2:		FDB	EXIT
+DIGS2		FDB	EXIT
 
 ;   SIGN	( n -- )
 ;		Add a minus sign to the numeric output string.
@@ -1847,7 +1848,7 @@ SIGN		jsr DOLST
 		FDB	ZLESS
 		FDB	QBRAN,SIGN1
 		FDB	DOLIT,'-',HOLD
-SIGN1:		FDB	EXIT
+SIGN1		FDB	EXIT
 
 ;   #>		( w -- b u )
 ;		Prepare the output string to be TYPE'd.
@@ -1905,7 +1906,7 @@ DIGTQ		jsr DOLST
 		FCB	7
 		FDB	SUBB
 		FDB	DUPP,DOLIT,10,LESS,ORR
-DGTQ1:		FDB	DUPP,RFROM,ULESS,EXIT
+DGTQ1		FDB	DUPP,RFROM,ULESS,EXIT
 
 ;   NUMBER?	( a -- n T | a F )
 ;		Convert a number string to integer. Push a flag on tos.
@@ -1918,11 +1919,11 @@ NUMBQ		jsr DOLST
 		FDB	QBRAN,NUMQ1
 		FDB	HEX,SWAP,PLUS1
 		FDB	SWAP,MINUS1
-NUMQ1:		FDB	OVER,CAT,DOLIT,'-',EQUAL,TOR
+NUMQ1		FDB	OVER,CAT,DOLIT,'-',EQUAL,TOR
 		FDB	SWAP,RAT,SUBB,SWAP,RAT,PLUS,QDUP
 		FDB	QBRAN,NUMQ6
 		FDB	MINUS1,TOR
-NUMQ2:		FDB	DUPP,TOR,CAT,BASE,AT,DIGTQ
+NUMQ2		FDB	DUPP,TOR,CAT,BASE,AT,DIGTQ
 		FDB	QBRAN,NUMQ4
 		FDB	SWAP,BASE,AT,STAR,PLUS,RFROM
 		FDB	PLUS1
@@ -1930,11 +1931,11 @@ NUMQ2:		FDB	DUPP,TOR,CAT,BASE,AT,DIGTQ
 		FDB	RAT,SWAP,DROP
 		FDB	QBRAN,NUMQ3
 		FDB	NEGAT
-NUMQ3:		FDB	SWAP
+NUMQ3		FDB	SWAP
 		FDB	BRAN,NUMQ5
-NUMQ4:		FDB	RFROM,RFROM,DDROP,DDROP,ZERO
-NUMQ5:		FDB	DUPP
-NUMQ6:		FDB	RFROM,DDROP
+NUMQ4		FDB	RFROM,RFROM,DDROP,DDROP,ZERO
+NUMQ5		FDB	DUPP
+NUMQ6		FDB	RFROM,DDROP
 		FDB	RFROM,BASE,STORE,EXIT
 
 ;; Basic I/O
@@ -1954,7 +1955,7 @@ QKEY		jsr DOLST
 		FDB KEY,L1270
 L1280		FCB 3,"KEY"
 KEY		jsr DOLST
-KEY1:		FDB	QKEY
+KEY1		FDB	QKEY
 		FDB	QBRAN,KEY1
 		FDB	EXIT
 
@@ -1977,7 +1978,7 @@ NUFQ		jsr DOLST
 		FDB	DDROP,KEY,DOCLIT
 		FCB	CRR
 		FDB	EQUAL
-NUFQ1:		FDB	EXIT
+NUFQ1		FDB	EXIT
 
 ;   PACE	( -- )
 ;		Send a pace character for the file downloading process.
@@ -2005,8 +2006,8 @@ L1330		FCB 6,"SPACES"
 SPACS		jsr DOLST
 		FDB	ZERO,MAX,TOR
 		FDB	BRAN,CHAR2
-CHAR1:		FDB	SPACE
-CHAR2:		FDB	DONXT,CHAR1
+CHAR1		FDB	SPACE
+CHAR2		FDB	DONXT,CHAR1
 		FDB	EXIT
 
 ;   TYPE	( b u -- )
@@ -2017,9 +2018,9 @@ L1340		FCB 4,"TYPE"
 TYPES		jsr DOLST
 		FDB	TOR
 		FDB	BRAN,TYPE2
-TYPE1:		FDB	DUPP,CAT,EMIT
+TYPE1		FDB	DUPP,CAT,EMIT
 		FDB	PLUS1
-TYPE2:		FDB	DONXT,TYPE1
+TYPE2		FDB	DONXT,TYPE1
 		FDB	DROP,EXIT
 
 ;   CR		( -- )
@@ -2099,7 +2100,7 @@ DOT		jsr DOLST
 		FDB	XORR			;?decimal
 		FDB	QBRAN,DOT1
 		FDB	UDOT,EXIT		;no, display unsigned
-DOT1:		FDB	STR,SPACE,TYPES,EXIT	;yes, display signed
+DOT1		FDB	STR,SPACE,TYPES,EXIT	;yes, display signed
 
 ;   ?		( a -- )
 ;		Display the contents in a memory cell.
@@ -2122,29 +2123,29 @@ PARS		jsr DOLST
 		FDB	MINUS1,TEMP,AT,BLANK,EQUAL
 		FDB	QBRAN,PARS3
 		FDB	TOR
-PARS1:		FDB	BLANK,OVER,CAT		;skip leading blanks ONLY
+PARS1		FDB	BLANK,OVER,CAT		;skip leading blanks ONLY
 		FDB	SUBB,ZLESS,INVER
 		FDB	QBRAN,PARS2
 		FDB	PLUS1
 		FDB	DONXT,PARS1
 		FDB	RFROM,DROP,ZERO,DUPP,EXIT
-PARS2:		FDB	RFROM
-PARS3:		FDB	OVER,SWAP
+PARS2		FDB	RFROM
+PARS3		FDB	OVER,SWAP
 		FDB	TOR
-PARS4:		FDB	TEMP,AT,OVER,CAT,SUBB	;scan for delimiter
+PARS4		FDB	TEMP,AT,OVER,CAT,SUBB	;scan for delimiter
 		FDB	TEMP,AT,BLANK,EQUAL
 		FDB	QBRAN,PARS5
 		FDB	ZLESS
-PARS5:		FDB	QBRAN,PARS6
+PARS5		FDB	QBRAN,PARS6
 		FDB	PLUS1
 		FDB	DONXT,PARS4
 		FDB	DUPP,TOR
 		FDB	BRAN,PARS7
-PARS6:		FDB	RFROM,DROP,DUPP
+PARS6		FDB	RFROM,DROP,DUPP
 		FDB	PLUS1,TOR
-PARS7:		FDB	OVER,SUBB
+PARS7		FDB	OVER,SUBB
 		FDB	RFROM,RFROM,SUBB,EXIT
-PARS8:		FDB	OVER,RFROM,SUBB,EXIT
+PARS8		FDB	OVER,RFROM,SUBB,EXIT
 
 ;   PARSE	( c -- b u ; <string> )
 ;		Scan input stream and return counted string delimited by c.
@@ -2176,7 +2177,7 @@ PAREN 		jsr DOLST
 ;		Ignore following text till the end of line.
 
 		FDB BKSLA,L1470
-L1480		FCB IMEDD+1,"\"
+L1480		FCB IMEDD+1,92 ; '\' but give as numeric to avoid different escap char processing in different assemblers
 BKSLA		jsr DOLST
 		FDB	NTIB,AT,INN,STORE,EXIT
 
@@ -2226,12 +2227,12 @@ L1530		FCB 5,"SAME?"
 SAMEQ 		jsr DOLST
 		FDB	TOR
 		FDB	BRAN,SAME2
-SAME1:		FDB	OVER,RAT,PLUS,CAT
+SAME1		FDB	OVER,RAT,PLUS,CAT
 		FDB	OVER,RAT,PLUS,CAT
 		FDB	SUBB,QDUP
 		FDB	QBRAN,SAME2
 		FDB	RFROM,DROP,EXIT
-SAME2:		FDB	DONXT,SAME1
+SAME2		FDB	DONXT,SAME1
 		FDB	DOLIT,0,EXIT
 
 ;   find	( a va -- ca na | a F )
@@ -2243,20 +2244,20 @@ FIND		jsr DOLST
 		FDB	SWAP,DUPP,CAT,MINUS1
 		FDB	TEMP,STORE
 		FDB	DUPP,AT,TOR,CELLP,SWAP
-FIND1:		FDB	AT,DUPP
+FIND1		FDB	AT,DUPP
 		FDB	QBRAN,FIND6
 		FDB	DUPP,AT,DOLIT,MASKK,ANDD,RAT,XORR
 		FDB	QBRAN,FIND2
 		FDB	CELLP,MONE
 		FDB	BRAN,FIND3
-FIND2:		FDB	CELLP,TEMP,AT,SAMEQ
-FIND3:		FDB	BRAN,FIND4
-FIND6:		FDB	RFROM,DROP
+FIND2		FDB	CELLP,TEMP,AT,SAMEQ
+FIND3		FDB	BRAN,FIND4
+FIND6		FDB	RFROM,DROP
 		FDB	SWAP,CELLM,SWAP,EXIT
-FIND4:		FDB	QBRAN,FIND5
+FIND4		FDB	QBRAN,FIND5
 		FDB	CELLM,CELLM
 		FDB	BRAN,FIND1
-FIND5:		FDB	RFROM,DROP,SWAP,DROP
+FIND5		FDB	RFROM,DROP,SWAP,DROP
 		FDB	CELLM
 		FDB	DUPP,NAMET,SWAP,EXIT
 
@@ -2269,14 +2270,14 @@ NAMEQ		jsr DOLST
 		FDB	CNTXT,DUPP,DAT,XORR
 		FDB	QBRAN,NAMQ1
 		FDB	CELLM
-NAMQ1:		FDB	TOR
-NAMQ2:		FDB	RFROM,CELLP,DUPP,TOR
+NAMQ1		FDB	TOR
+NAMQ2		FDB	RFROM,CELLP,DUPP,TOR
 		FDB	AT,QDUP
 		FDB	QBRAN,NAMQ3
 		FDB	FIND,QDUP
 		FDB	QBRAN,NAMQ2
 		FDB	RFROM,DROP,EXIT
-NAMQ3:		FDB	RFROM,DROP
+NAMQ3		FDB	RFROM,DROP
 		FDB	ZERO,EXIT
 
 ;; Terminal response
@@ -2292,7 +2293,7 @@ BKSP		jsr DOLST
 		FDB	DOLIT,BKSPP,TECHO,ATEXE,MINUS1
 		FDB	BLANK,TECHO,ATEXE
 		FDB	DOLIT,BKSPP,TECHO,ATEXE
-BACK1:		FDB	EXIT
+BACK1		FDB	EXIT
 
 ;   TAP		( bot eot cur c -- bot eot cur )
 ;		Accept and echo the key stroke and bump the cursor.
@@ -2317,8 +2318,8 @@ KTAP		jsr DOLST
 		FDB	SWAP,DOLIT,BKSPP2,XORR,ANDD
 		FDB	QBRAN,KTAP1
 		FDB	BLANK,TAP,EXIT
-KTAP1:		FDB	BKSP,EXIT
-KTAP2:		FDB	DROP,SWAP,DROP,DUPP,EXIT
+KTAP1		FDB	BKSP,EXIT
+KTAP2		FDB	DROP,SWAP,DROP,DUPP,EXIT
 
 ;   accept	( b u -- b u )
 ;		Accept characters to input buffer. Return with actual count.
@@ -2327,7 +2328,7 @@ KTAP2:		FDB	DROP,SWAP,DROP,DUPP,EXIT
 L1590		FCB 6,"ACCEPT"
 ACCEP		jsr DOLST
 		FDB	OVER,PLUS,OVER
-ACCP1:		FDB	DDUP,XORR
+ACCP1		FDB	DDUP,XORR
 		FDB	QBRAN,ACCP4
 		FDB	KEY,DUPP
 ;		FDB	BLANK,SUBB,DOLIT,95,ULESS
@@ -2335,9 +2336,9 @@ ACCP1:		FDB	DDUP,XORR
 		FDB	QBRAN,ACCP2
 		FDB	TAP
 		FDB	BRAN,ACCP3
-ACCP2:		FDB	TTAP,ATEXE
-ACCP3:		FDB	BRAN,ACCP1
-ACCP4:		FDB	DROP,OVER,SUBB,EXIT
+ACCP2		FDB	TTAP,ATEXE
+ACCP3		FDB	BRAN,ACCP1
+ACCP4		FDB	DROP,OVER,SUBB,EXIT
 
 ;   EXPECT	( b u -- )
 ;		Accept input stream and store count in SPAN.
@@ -2410,7 +2411,7 @@ L1660		FCB COMPO+6,"abort",'"'
 ABORQ		jsr DOLST
 		FDB	QBRAN,ABOR1		;text flag
 		FDB	DOSTR,THROW		;pass error string
-ABOR1:		FDB	DOSTR,DROP,EXIT		;drop error
+ABOR1		FDB	DOSTR,DROP,EXIT		;drop error
 
 ;; The text interpreter
 
@@ -2426,15 +2427,15 @@ INTER		jsr DOLST
 		FDB	ABORQ
 		FCB	13," compile only"
 		FDB	EXECU,EXIT		;execute defined word
-INTE1:		FDB	TNUMB,ATEXE		;convert a number
+INTE1		FDB	TNUMB,ATEXE		;convert a number
 		FDB	QBRAN,INTE2
 		FDB	EXIT
-INTE2:		FDB	THROW			;error
+INTE2		FDB	THROW			;error
 
 ;   [		( -- )
 ;		Start the text interpreter.
 
-		FDB LBRAC,l1670
+		FDB LBRAC,L1670
 L1680		FCB IMEDD+1,"["
 LBRAC		jsr DOLST
 		FDB	DOLIT,INTER,TEVAL,STORE,EXIT
@@ -2449,7 +2450,7 @@ DOTOK		jsr DOLST
 		FDB	QBRAN,DOTO1
 		FDB	DOTQP
 		FCB	3," ok"
-DOTO1:		FDB	CR,EXIT
+DOTO1		FDB	CR,EXIT
 
 ;   ?STACK	( -- )
 ;		Abort if the data stack underflows.
@@ -2468,11 +2469,11 @@ QSTAC		jsr DOLST
 		FDB EVAL,L1700
 L1710		FCB 4,"EVAL"
 EVAL		jsr DOLST
-EVAL1:		FDB	TOKEN,DUPP,CAT		;?input stream empty
+EVAL1		FDB	TOKEN,DUPP,CAT		;?input stream empty
 		FDB	QBRAN,EVAL2
 		FDB	TEVAL,ATEXE,QSTAC	;evaluate input, check stack
 		FDB	BRAN,EVAL1
-EVAL2:		FDB	DROP,TPROM,ATEXE,EXIT	;prompt
+EVAL2		FDB	DROP,TPROM,ATEXE,EXIT	;prompt
 
 ;; Shell
 
@@ -2539,8 +2540,8 @@ CONSO		jsr DOLST
 L1780		FCB 4,"QUIT"
 QUIT		jsr DOLST
 		FDB	RZERO,AT,RPSTO		;reset return stack pointer
-QUIT1:		FDB	LBRAC			;start interpretation
-QUIT2:		FDB	QUERY			;get input
+QUIT1		FDB	LBRAC			;start interpretation
+QUIT2		FDB	QUERY			;get input
 		FDB	DOLIT,EVAL,CATCH,QDUP	;evaluate input
 		FDB	QBRAN,QUIT2		;continue till error
 		FDB	TPROM,AT,TOR		;save input device
@@ -2549,10 +2550,10 @@ QUIT2:		FDB	QUERY			;get input
 		FDB	SPACE,COUNT,TYPES	;error message
 		FDB	DOTQP
 		FCB	3," ? "			;error prompt
-QUIT3:		FDB	RFROM,DOLIT,DOTOK,XORR	;?file input
+QUIT3		FDB	RFROM,DOLIT,DOTOK,XORR	;?file input
 		FDB	QBRAN,QUIT4
 		FDB	DOLIT,ERR,EMIT		;file error, tell host
-QUIT4:		FDB	PRESE			;some cleanup
+QUIT4		FDB	PRESE			;some cleanup
 		FDB	BRAN,QUIT1
 
 ;; The compiler
@@ -2566,7 +2567,7 @@ TICK		jsr DOLST
 		FDB	TOKEN,NAMEQ		;?defined
 		FDB	QBRAN,TICK1
 		FDB	EXIT			;yes, push code address
-TICK1:		FDB	THROW			;no, error
+TICK1		FDB	THROW			;no, error
 
 ;   ALLOT	( n -- )
 ;		Allocate n bytes to the code dictionary.
@@ -2663,7 +2664,7 @@ DOQDO
 		leas 2,s	;drop end
 		ldu ,u
 		pulu pc		;branch past loop
-DOQDO1:
+DOQDO1
 		puls x		;end
 		stx ,--y	;end to return stack
 		std ,--y	;start to return stack
@@ -2693,7 +2694,7 @@ DOMDO
 		leas 2,s	;drop end
 		ldu ,u
 		pulu pc		;branch past loop
-DOMDO1:
+DOMDO1
 		puls x		;end
 		stx ,--y	;end to return stack
 		std ,--y	;start to return stack
@@ -2735,13 +2736,13 @@ DOPLOOP
 		ldu ,u		; branch to begin of loop
 		pulu pc
 
-DOPLOF:		addd ,y		; start/index
+DOPLOF		addd ,y		; start/index
 		cmpd 2,y	; end
 		bge DOPLO1	; index >= end -> leave
 		std ,y		; save back
 		ldu ,u		; branch to begin of loop
 		pulu pc
-DOPLO1:
+DOPLO1
 		leau 2,u	; skip back destination
 		leay 4,y	; remove index and upper from r stack
 		pulu pc
@@ -2913,7 +2914,7 @@ UNIQU		jsr DOLST
 		FDB	DOTQP			;redefinitions are OK
 		FCB	7," reDef "		;but the user should be warned
 		FDB	OVER,COUNT,TYPES	;just in case its not planned
-UNIQ1:		FDB	DROP,EXIT
+UNIQ1		FDB	DROP,EXIT
 
 ;   $,n		( na -- )
 ;		Build a new dictionary name using the string at na.
@@ -2930,7 +2931,7 @@ SNAME		jsr DOLST
 		FDB	CRRNT,AT,AT,OVER,STORE
 		FDB	CELLM,DUPP,NP,STORE	;adjust name pointer
 		FDB	STORE,EXIT		;save code pointer
-PNAM1:		FDB	STRQP
+PNAM1		FDB	STRQP
 		FCB	5," name"		;null input
 		FDB	THROW
 
@@ -2947,11 +2948,11 @@ SCOMP		jsr DOLST
 		FDB	AT,DOLIT,IMEDD<<8,ANDD	;?immediate
 		FDB	QBRAN,SCOM1
 		FDB	EXECU,EXIT		;its immediate, execute
-SCOM1:		FDB	COMMA,EXIT		;its not immediate, compile
-SCOM2:		FDB	TNUMB,ATEXE		;try to convert to number
+SCOM1		FDB	COMMA,EXIT		;its not immediate, compile
+SCOM2		FDB	TNUMB,ATEXE		;try to convert to number
 		FDB	QBRAN,SCOM3
 		FDB	LITER,EXIT		;compile number as integer
-SCOM3:		FDB	THROW			;error
+SCOM3		FDB	THROW			;error
 
 ;   OVERT	( -- )
 ;		Link a new word into the current vocabulary.
@@ -3062,9 +3063,9 @@ L2140		FCB 5,"_TYPE"
 UTYPE		jsr DOLST
 		FDB	TOR			;start count down loop
 		FDB	BRAN,UTYP2		;skip first pass
-UTYP1:		FDB	DUPP,CAT,TCHAR,EMIT	;display only printable
+UTYP1		FDB	DUPP,CAT,TCHAR,EMIT	;display only printable
 		FDB	PLUS1		;increment address
-UTYP2:		FDB	DONXT,UTYP1		;loop till done
+UTYP2		FDB	DONXT,UTYP1		;loop till done
 		FDB	DROP,EXIT
 
 ;   dm+		( a u -- a )
@@ -3076,9 +3077,9 @@ DUMPP		jsr DOLST
 		FDB	OVER,DOLIT,4,UDOTR	;display address
 		FDB	SPACE,TOR		;start count down loop
 		FDB	BRAN,PDUM2		;skip first pass
-PDUM1:		FDB	DUPP,CAT,DOLIT,3,UDOTR	;display numeric data
+PDUM1		FDB	DUPP,CAT,DOLIT,3,UDOTR	;display numeric data
 		FDB	PLUS1			;increment address
-PDUM2:		FDB	DONXT,PDUM1		;loop till done
+PDUM2		FDB	DONXT,PDUM1		;loop till done
 		FDB	EXIT
 
 ;   DUMP	( a u -- )
@@ -3092,7 +3093,7 @@ DUMP		jsr DOLST
 		FCB	16
 		FDB	SLASH			;change count to lines
 		FDB	TOR			;start count down loop
-DUMP1:		FDB	CR,DOCLIT
+DUMP1		FDB	CR,DOCLIT
 		FCB	16
 		FDB	DDUP,DUMPP		;display numeric
 		FDB	ROT,ROT
@@ -3101,8 +3102,8 @@ DUMP1:		FDB	CR,DOCLIT
 		FDB	QBRAN,DUMP2
 		FDB	DONXT,DUMP1		;loop till done
 		FDB	BRAN,DUMP3
-DUMP2:		FDB	RFROM,DROP		;cleanup loop stack, early exit
-DUMP3:		FDB	DROP,RFROM,BASE,STORE	;restore radix
+DUMP2		FDB	RFROM,DROP		;cleanup loop stack, early exit
+DUMP3		FDB	DROP,RFROM,BASE,STORE	;restore radix
 		FDB	EXIT
 
 ;   .S		( ... -- ... )
@@ -3114,8 +3115,8 @@ DOTS		jsr DOLST
 		FDB	CR,DEPTH		;stack depth
 		FDB	TOR			;start count down loop
 		FDB	BRAN,DOTS2		;skip first pass
-DOTS1:		FDB	RAT,PICK,DOT		;index stack, display contents
-DOTS2:		FDB	DONXT,DOTS1		;loop till done
+DOTS1		FDB	RAT,PICK,DOT		;index stack, display contents
+DOTS2		FDB	DONXT,DOTS1		;loop till done
 		FDB	DOTQP
 		FCB	4," <sp"
 		FDB	EXIT
@@ -3146,19 +3147,19 @@ QCSP		jsr DOLST
 L2200		FCB 5,">NAME"
 TNAME		jsr DOLST
 		FDB	CRRNT			;vocabulary link
-TNAM1:		FDB	CELLP,AT,QDUP		;check all vocabularies
+TNAM1		FDB	CELLP,AT,QDUP		;check all vocabularies
 		FDB	QBRAN,TNAM4
 		FDB	DDUP
-TNAM2:		FDB	AT,DUPP			;?last word in a vocabulary
+TNAM2		FDB	AT,DUPP			;?last word in a vocabulary
 		FDB	QBRAN,TNAM3
 		FDB	DDUP,NAMET,XORR		;compare
 		FDB	QBRAN,TNAM3
 		FDB	CELLM			;continue with next word
 		FDB	BRAN,TNAM2
-TNAM3:		FDB	SWAP,DROP,QDUP
+TNAM3		FDB	SWAP,DROP,QDUP
 		FDB	QBRAN,TNAM1
 		FDB	SWAP,DROP,SWAP,DROP,EXIT
-TNAM4:		FDB	DROP,DOLIT,0,EXIT
+TNAM4		FDB	DROP,DOLIT,0,EXIT
 
 ;   .ID		( na -- )
 ;		Display the name at address.
@@ -3172,7 +3173,7 @@ DOTID		jsr DOLST
 		FCB	$1F
 		FDB	ANDD			;mask lexicon bits
 		FDB	UTYPE,EXIT		;display name string
-DOTI1:		FDB	DOTQP
+DOTI1		FDB	DOTQP
 		FCB	9," {noName}"
 		FDB	EXIT
 
@@ -3192,11 +3193,11 @@ SEE		jsr DOLST
 		FDB	CR,DOTQP		;primitive word only
 		FCB	9, " PRIMITVE"		
 		FDB	BRAN,SEE5		;exit
-SEE1:		FDB	CR,CELLP,DUPP,UDOT,SPACE
+SEE1		FDB	CR,CELLP,DUPP,UDOT,SPACE
 		FDB	DUPP,AT,DUPP		;?does it contain a zero
 		FDB	QBRAN,SEE2
 		FDB	TNAME			;?is it a name
-SEE2:		FDB	QDUP			;name address or zero
+SEE2		FDB	QDUP			;name address or zero
 		FDB	QBRAN,SEE3
 
 		FDB	SPACE,DOTID		;display name
@@ -3208,7 +3209,7 @@ SEE2:		FDB	QDUP			;name address or zero
 		FDB	SWAP,PLUS1,SWAP
 		FDB	BRAN,SEE28
 
-SEE21:		FDB	DUPP,DOLIT,DOLIT,EQUAL	; doCLIT?
+SEE21		FDB	DUPP,DOLIT,DOLIT,EQUAL	; doCLIT?
 		FDB	OVER,DOLIT,QBRAN,EQUAL,ORR ; ?BRAN ?
 		FDB	OVER,DOLIT,BRAN,EQUAL,ORR; BRANCH ?
 		FDB	OVER,DOLIT,DONXT,EQUAL,ORR; next ? (from FOR/NEXT)
@@ -3220,7 +3221,7 @@ SEE21:		FDB	DUPP,DOLIT,DOLIT,EQUAL	; doCLIT?
 		FDB	QBRAN,SEE27
 		FDB	SWAP,CELLP,DUPP,AT,SPACE,UDOT,SWAP ; LIT: get word
 		FDB	BRAN,SEE28
-SEE27:		
+SEE27		
 		FDB	DUPP,DOLIT,DOTQP,EQUAL	; ." ..."
 		FDB	OVER,DOLIT,ABORQ,EQUAL,ORR ; ABORT" ..."
 		FDB	OVER,DOLIT,STRQP,EQUAL,ORR ; $" ..."
@@ -3231,19 +3232,19 @@ SEE27:
 		FDB	EMIT
 		FDB	COUNT,PLUS,CELLM,SWAP	; adjust continuation address
 
-SEE28:		FDB	DROP			; LEAVL, without EXIT check
+SEE28		FDB	DROP			; LEAVL, without EXIT check
 		FDB	BRAN,SEE4
-SEE29:		FDB	DROP			; ELSE
+SEE29		FDB	DROP			; ELSE
 		FDB	BRAN,SEE31		; cleanup, check for EXIT
 
-SEE3:		FDB	DUPP,AT,UDOT		;display number
+SEE3		FDB	DUPP,AT,UDOT		;display number
 		FDB	BRAN,SEE4
-SEE31:		FDB	DUPP,AT,DOLIT,EXIT,XORR ; stop on EXIT word
+SEE31		FDB	DUPP,AT,DOLIT,EXIT,XORR ; stop on EXIT word
 						; but not if SEE decompiles itself!
 		FDB	QBRAN,SEE5
-SEE4:		FDB	NUFQ	 		;user control
+SEE4		FDB	NUFQ	 		;user control
 		FDB	QBRAN,SEE1
-SEE5:		FDB	RFROM,BASE,STORE,DROP,EXIT
+SEE5		FDB	RFROM,BASE,STORE,DROP,EXIT
 
 ;   WORDS	( -- )
 ;		Display the names in the context vocabulary.
@@ -3252,13 +3253,13 @@ SEE5:		FDB	RFROM,BASE,STORE,DROP,EXIT
 L2230		FCB 5,"WORDS"
 WORDS		jsr DOLST
 		FDB	CR,CNTXT,AT		;only in context
-WORS1:		FDB	AT,QDUP			;?at end of list
+WORS1		FDB	AT,QDUP			;?at end of list
 		FDB	QBRAN,WORS2
 		FDB	DUPP,SPACE,DOTID	;display a name
 		FDB	CELLM,NUFQ		;user control
 		FDB	QBRAN,WORS1
 		FDB	DROP
-WORS2:		FDB	EXIT
+WORS2		FDB	EXIT
 
 ;; Hardware reset
 
@@ -3298,7 +3299,7 @@ TBOOT
 		FDB COLD,L2260
 L2270		FCB 4,"COLD"
 COLD		jsr DOLST		
-COLD1:		FDB	DOLIT,UZERO,DOLIT,UPP
+COLD1		FDB	DOLIT,UZERO,DOLIT,UPP
 		FDB	DOLIT,ULAST-UZERO,CMOVE	;initialize user area
 		FDB	PRESE			;initialize data stack and TIB
 		FDB	TBOOT,ATEXE		;application boot
