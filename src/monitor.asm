@@ -16,6 +16,7 @@
 
 * Reserved Zero page addresses
 		org $0000
+		setdp 0
 * First the I/O routine vectors.
 getchar		rmb 3		;Jump to getchar routine.
 putchar		rmb 3		;Jump to putchar routine.
@@ -319,7 +320,7 @@ endvecs 	equ *
 		
 * The J command returns here.
 stakregs        pshs x		     ;Stack something where the pc comes
-		pshs ccr,b,a,dp,x,y,u ;Stack the normal registers.
+		pshs cc,b,a,dp,x,y,u ;Stack the normal registers.
 		ldx oldpc	
 		stx 10,s	     ;Stack the old pc value.
 		bra unlaunch1
@@ -451,7 +452,7 @@ convexit	orcc #$04
 scanexit  	ldd temp
 		leax -1,x
 		tst temp2
-		rts		<-- exit point of scanhex
+		rts		;<-- exit point of scanhex 
 
 * Scan for hexadecimal number at address X return in D, Z flag is set it no
 * number found.
@@ -642,7 +643,7 @@ go		ldx #linebuf+1
 		beq launch		
 		std 10,s	;Store parameter in pc location.
 launch		jsr arm         ;Arm the breakpoints.  
-		puls ccr,b,a,dp,x,y,u,pc
+		puls cc,b,a,dp,x,y,u,pc
 
 * This is the code for the J command, run a subroutine.
 * Syntax J<addr>
