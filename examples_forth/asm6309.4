@@ -1,0 +1,454 @@
+\ 6309 assembler
+
+BASE @ HEX
+
+: DEFER CREATE 0 , DOES> @ EXECUTE ;
+: IS ' >BODY ! ;
+
+VOCABULARY ASSEMBLER
+ASSEMBLER ALSO DEFINITIONS
+
+' C! DEFER VC! IS VC! \ Vectorize the important words so we can cross
+' C@ DEFER VC@ IS VC@ \ assemble and self-assemble using the same code.
+' !  DEFER V!  IS V!
+' @  DEFER V@  IS V@
+' C, DEFER C, IS C,
+' ,  DEFER ,  IS ,
+' HERE DEFER HERE IS HERE
+' ALLOT DEFER ALLOT IS ALLOT
+
+VARIABLE VDP
+: VHERE ( --- addr)
+  VDP @ ;
+: VALLOT VDP +! ;
+: VC, ( c --- )
+  VHERE VC! 1 VALLOT ;
+: V, ( n ---)
+  VHERE V! 2 VALLOT ;
+: ORG VDP ! ;
+
+: <MARK ( --- addr )
+  HERE ;
+: <RESOLVE ( addr ---)
+  HERE 1+ - C, ;
+: >MARK ( --- addr )
+  HERE 0 C, ;
+: >RESOLVE ( addr --- )
+  HERE OVER 1+ - SWAP VC! ;
+
+VARIABLE ?MEMIMM                   \ Memory + immediate (AIM, OIM, EOIM)
+VARIABLE ?OPCODE  VARIABLE OPCODE  \ Opcode byte
+VARIABLE ?POSTBYTE VARIABLE POSTBYTE \ Byte after opcode indicating mode.
+VARIABLE ?OPERAND  \ Address or data after instruction.
+VARIABLE MODE \ True is direct addressing false is other.
+VARIABLE DPAGE \ Direct page address.
+: SETDP ( n ---) \ Set direct page.
+  100 * DPAGE ! ;
+0 SETDP
+
+: NOINSTR \ Reset all the instruction flags so there will be no instruction.
+  ?OPCODE OFF ?POSTBYTE OFF ?OPERAND OFF MODE OFF ?MEMIMM OFF ;
+: A; \ Assemble current instruction and reset instruction flags.
+  MODE @  IF \ direct addresiing?
+   DUP DPAGE @ - 0FF U> IF \ Is address 16 bits?
+    2 ?OPERAND ! \ Indicate 16 bits address.
+    OPCODE @ 0F0 AND 0= \ Change opcode byte.
+     IF 70 OPCODE +!
+     ELSE 20 OPCODE +!
+     THEN
+   ELSE 1 ?OPERAND ! \ Indicate 8 bis address.
+   THEN
+  THEN
+  ?OPCODE @ IF
+     OPCODE @ DUP 100 > IF
+       DUP 8 RSHIFT C,  \ assemble prebyte  
+     THEN
+     C,
+  THEN
+  ?MEMIMM @ IF
+      ?OPERAND @ IF SWAP THEN \ move immediate byte from under operand.
+      C,
+  THEN
+  ?POSTBYTE @ IF POSTBYTE @ C, THEN
+  ?OPERAND @ IF
+   CASE ?OPERAND @
+    1 OF C, ENDOF            \ 8 bits data/address.
+    2 OF , ENDOF             \ 16 bits data/address.
+    3 OF HERE 1+ - C, ENDOF  \ 8 bits relative address.
+    4 OF HERE 2 + - , ENDOF  \ 16 bits relative address.
+    5 OF , , ENDOF           \ 32 bits immediate (LDQ)
+    6 OF                     \ single-bit operations.
+     >R                      \ Save DP address.
+     SWAP 3 LSHIFT OR        \ or the bit numbers together.
+     SWAP 6 AND 5 LSHIFT OR  \ Add register number.
+     C,                      \ Store post-byte (reg-srcbit-dstbit)
+     R> C,                   \ Store direct address.
+     ENDOF              \ LDBT etc.
+   ENDCASE
+  THEN NOINSTR ;
+
+
+: LABEL A; HERE CONSTANT ;
+
+
+HEX
+
+: # \ Signal immediate mode.
+   MODE OFF -10 OPCODE +!
+   ?OPERAND @ 5 = IF \ Special case is LDQ immediate.
+     0CD OPCODE !
+   THEN
+;
+
+: USE-POSTBYTE \ Signal that postbyte must be used.
+  MODE OFF
+  ?POSTBYTE ON
+  OPCODE @ 0F0 AND 0= IF
+   60 OPCODE +!
+  ELSE
+   OPCODE @ 80 AND IF
+    10 OPCODE +!
+   THEN
+  THEN ;
+
+: [] \ Signal indirect mode.
+  MODE @ IF \ Indirect addressing with 16-bits addres, no postbyte made yet.
+   USE-POSTBYTE
+   9F POSTBYTE !   \ Make postbyte.
+   2 ?OPERAND !     \ Indicate 16-bits address.
+  ELSE
+   POSTBYTE @ 80 AND 0= IF \ 5-bits address format already assembled?
+    POSTBYTE @ 1F AND DUP 10 AND 0<> 0E0 AND OR
+    1 ?OPERAND !            \ Signal operand.
+    POSTBYTE @ 60 AND 98 OR POSTBYTE ! \ Change postbyte.
+   ELSE
+    POSTBYTE @ 9F AND 8F =
+    IF
+      POSTBYTE @ 1+ POSTBYTE ! \ special case for ,W indexing
+    ELSE
+      POSTBYTE @ 10 OR POSTBYTE ! \ Indicate indirect addressing.
+    THEN
+   THEN
+  THEN ;
+
+: ,R \ Modes with a constant offset from a register.
+  CREATE C,
+  DOES> USE-POSTBYTE
+        C@ POSTBYTE ! \ Make register field in postbyte.
+        DUP 0= IF
+         84 POSTBYTE +! DROP \ Zero offset.
+         ?OPERAND OFF
+        ELSE
+         DUP -10 >= OVER 0F <= AND IF \ 5-bit offset.
+          1F AND POSTBYTE +!
+          ?OPERAND OFF
+         ELSE
+          DUP 80 + 100 U< IF \ 8-bit offset.
+           88 POSTBYTE +!
+           1 ?OPERAND !
+          ELSE
+           89 POSTBYTE +!    \ 16-bit offset.
+           2 ?OPERAND !
+          THEN
+         THEN
+        THEN ;
+00 ,R ,X
+20 ,R ,Y
+40 ,R ,U
+60 ,R ,S
+
+: ,W \ Addressing with constant offset from W register.
+  USE-POSTBYTE
+  DUP 0= IF
+    8F POSTBYTE ! DROP  \ offset = 0
+    ?OPERAND OFF
+  ELSE
+    0AF POSTBYTE !   \ 16-bit offset
+    2 ?OPERAND !
+  THEN
+;
+
+: AMODE \ addressing modes with no operands.
+  CREATE C,
+  DOES> USE-POSTBYTE
+        C@ POSTBYTE !
+        ?OPERAND OFF ;
+080 AMODE ,X+   081 AMODE ,X++ 082 AMODE ,-X   083 AMODE ,--X
+085 AMODE B,X   086 AMODE A,X  08B AMODE D,X
+087 AMODE E,X   08A AMODE F,X  08E AMODE W,X
+0A0 AMODE ,Y+   0A1 AMODE ,Y++ 0A2 AMODE ,-Y   0A3 AMODE ,--Y
+0A5 AMODE B,Y   0A6 AMODE A,Y  0AB AMODE D,Y
+0A7 AMODE E,Y   0AA AMODE F,Y  0AE AMODE W,Y
+0C0 AMODE ,U+   0C1 AMODE ,U++ 0C2 AMODE ,-U   0C3 AMODE ,--U
+0C5 AMODE B,U   0C6 AMODE A,U  0CB AMODE D,U
+0C7 AMODE E,U   0CA AMODE F,U  0CE AMODE W,U
+0E0 AMODE ,S+   0E1 AMODE ,S++ 0E2 AMODE ,-S   0E3 AMODE ,--S
+0E5 AMODE B,S   0E6 AMODE A,S  0EB AMODE D,S
+0E7 AMODE E,S   0EA AMODE F,S  0EE AMODE W,S
+0CF AMODE ,W++  0EF AMODE ,--W
+
+: ,PCR \ Signal program counter relative.
+  USE-POSTBYTE
+  DUP
+  HERE OPCODE @ 0FF U> - 3 + - \ Subtract address after instruction
+  80 + 100 U< IF \ 8-bits offset good?
+   3 ?OPERAND !
+   8C POSTBYTE !
+  ELSE
+   4 ?OPERAND !
+   8D POSTBYTE !
+  THEN ;
+
+: USE-OPCODE ( w ---)
+  ?OPCODE ON
+  OPCODE ! ;
+
+: GET-OPCODE ( addr -- )\
+  >R A; R> @ USE-OPCODE ;
+
+: IN1 \ Simple instructions with only opcode, possibly prebyte
+  CREATE ,
+  DOES> GET-OPCODE ;
+12 IN1 NOP    13 IN1 SYNC
+14 IN1 SEXW
+19 IN1 DAA    1D IN1 SEX
+39 IN1 RTS    3A IN1 ABX
+3B IN1 RTI    3D IN1 MUL
+1038 IN1 PSHSW 1039 IN1 PULSW
+103A IN1 PSHUW 103B IN1 PULUW
+3F IN1 SWI    103F IN1 SWI2 113F IN1 SWI3
+40 IN1 NEGA   50 IN1 NEGB
+43 IN1 COMA   53 IN1 COMB
+44 IN1 LSRA   54 IN1 LSRB
+46 IN1 RORA   56 IN1 RORB
+47 IN1 ASRA   57 IN1 ASRB
+48 IN1 ASLA   58 IN1 ASLB
+48 IN1 LSLA   58 IN1 LSLB
+49 IN1 ROLA   59 IN1 ROLB
+4A IN1 DECA   5A IN1 DECB
+4C IN1 INCA   5C IN1 INCB
+4D IN1 TSTA   5D IN1 TSTB
+4F IN1 CLRA   5F IN1 CLRB
+1040 IN1 NEGD 1050 IN1 NEGW
+1043 IN1 COMD 1051 IN1 COMW
+1044 IN1 LSRD 1054 IN1 LSRW
+1046 IN1 RORD 1056 IN1 RORW
+1047 IN1 ASRD  \ what were they smoking when they decided to leave out ASRW/ASLW
+1048 IN1 ASLD
+1048 IN1 LSRD
+1049 IN1 ROLD 1059 IN1 ROLW
+104A IN1 DECD 105A IN1 DECW
+104C IN1 INCD 105C IN1 INCW
+104D IN1 TSTD 105D IN1 TSTW
+104F IN1 CLRD 105F IN1 CLRW
+1143 IN1 COME 1153 IN1 COMF
+114A IN1 DECE 115A IN1 DECF
+114C IN1 INCE 115C IN1 INCF
+114D IN1 TSTE 115D IN1 TSTF
+114F IN1 CLRE 115F IN1 CLRF
+
+\ Though not no-operand instructions the LEA instructions
+\ are treated correctly as the postbyte is added by the mode words.
+30 IN1 LEAX   31 IN1 LEAY
+32 IN1 LEAS   33 IN1 LEAU
+
+: BR-8 \ relative branches with 8-bit offset
+  CREATE ,
+  DOES> GET-OPCODE 3 ?OPERAND ! ;
+  20 BR-8 BRA   21 BR-8 BRN
+  22 BR-8 BHI   23 BR-8 BLS
+  24 BR-8 BCC   25 BR-8 BCS
+  24 BR-8 BHS   25 BR-8 BLO
+  26 BR-8 BNE   27 BR-8 BEQ
+  28 BR-8 BVC   29 BR-8 BVS
+  2A BR-8 BPL   2B BR-8 BMI
+  2C BR-8 BGE   2D BR-8 BLT
+  2E BR-8 BGT   2F BR-8 BLE
+  8D BR-8 BSR
+
+: LBRA
+  A; 16 USE-OPCODE 4 ?OPERAND ! ;
+: LBSR
+  A; 17 USE-OPCODE 4 ?OPERAND ! ;
+
+: BR16 \ Relative branches with 16-bit offset.
+  CREATE ,
+  DOES> GET-OPCODE 4 ?OPERAND ! ;
+                  1021 BR16 LBRN
+  1022 BR16 LBHI  1023 BR16 LBLS
+  1024 BR16 LBCC  1025 BR16 LBCS
+  1024 BR16 LBHS  1025 BR16 LBLO
+  1026 BR16 LBNE  1027 BR16 LBEQ
+  1028 BR16 LBVC  1029 BR16 LBVS
+  102A BR16 LBPL  102B BR16 LBMI
+  102C BR16 LBGE  102D BR16 LBLT
+  102E BR16 LBGT  102F BR16 LBLE
+
+: IN2 \ Instructions with one immediate data byte.
+  CREATE ,
+  DOES> GET-OPCODE 1 ?OPERAND ! ;
+1A IN2 ORCC  1C IN2 ANDCC  3C IN2 CWAI
+113C IN2 BITMD 113D IN2 LDMD 
+: % ( --- n) \ Interpret next word as a binary number.
+  BASE @ 2 BASE ! BL WORD NUMBER? drop DROP SWAP BASE ! ;
+
+: REG \ Registers as used in PUSH PULL TFR and EXG instructions.
+  CREATE C, C,
+  DOES> ?OPERAND @ IF \ Is a PUSH/PULL instruction meant?
+         1+ C@ OR
+        ELSE
+         C@ POSTBYTE +! \ It's a TFR,EXG instruction.
+        THEN ;
+06 00 REG D,  06 00 REG D
+10 10 REG X,  10 01 REG X
+20 20 REG Y,  20 02 REG Y
+40 30 REG U,  40 03 REG U
+40 40 REG S,  40 04 REG S
+80 50 REG PC, 80 05 REG PC
+00 60 REG W,  00 06 REG W
+00 70 REG V,  00 07 REG V
+02 80 REG A,  02 08 REG A
+04 90 REG B,  04 09 REG B
+01 A0 REG CC, 01 0A REG CC
+08 B0 REG DP, 08 0B REG DP
+00 C0 REG Z,  08 0C REG Z \ Zero register.
+00 E0 REG E,  00 0E REG E
+00 F0 REG F,  00 0F REG F
+
+: R2R \ Reg to reg instructions
+  CREATE , DOES> GET-OPCODE ?POSTBYTE ON 0 POSTBYTE ! ;
+  1E R2R EXG
+  1F R2R TFR
+1030 R2R ADDR
+1031 R2R ADCR
+1032 R2R SUBR
+1033 R2R SBCR
+1034 R2R ANDR
+1035 R2R ORR
+1036 R2R EORR
+1037 R2R CMPR
+
+1138 R2R TFM++ \ TFM++ X, Y   for tfm x+,y+
+1139 R2R TFM-- \ TFM-- X, Y   for tfm x-,y-
+113A R2R TFM+0 \ TFM+0 X, Y   for tfm x+,y
+113B R2R TFM0+ \ TFM0+ X, Y   for tfm x,y+
+
+
+: STK \ Stack instructions.
+  CREATE ,
+  DOES> GET-OPCODE
+        1 ?OPERAND ! 0 ;
+34 STK PSHS  35 STK PULS
+36 STK PSHU  37 STK PULU
+
+: OP-8 \ Instructions with 8-bits data.
+  CREATE ,
+  DOES> GET-OPCODE
+        MODE ON
+        1 ?OPERAND ! ;
+00 OP-8 NEG  03 OP-8 COM
+04 OP-8 LSR  06 OP-8 ROR
+07 OP-8 ASR  08 OP-8 ASL
+08 OP-8 LSL  09 OP-8 ROL
+0A OP-8 DEC  0C OP-8 INC
+0D OP-8 TST  0E OP-8 JMP
+0F OP-8 CLR
+90 OP-8 SUBA 0D0 OP-8 SUBB
+91 OP-8 CMPA 0D1 OP-8 CMPB
+92 OP-8 SBCA 0D2 OP-8 SBCB
+94 OP-8 ANDA 0D4 OP-8 ANDB
+95 OP-8 BITA 0D5 OP-8 BITB
+96 OP-8 LDA  0D6 OP-8 LDB
+97 OP-8 STA  0D7 OP-8 STB
+98 OP-8 EORA 0D8 OP-8 EORB
+99 OP-8 ADCA 0D9 OP-8 ADCB
+9A OP-8 ORA  0DA OP-8 ORB
+9B OP-8 ADDA 0DB OP-8 ADDB
+9D OP-8 JSR
+1190 OP-8 SUBE 11D0 OP-8 SUBF
+1191 OP-8 CMPE 11D1 OP-8 CMPF
+1196 OP-8 LDE  11D6 OP-8 LDF
+1197 OP-8 STE  11D7 OP-8 STF
+119B OP-8 ADDE 11DB OP-8 ADDF
+119D OP-8 DIVD
+
+: OP16 \ Instructions with 16-bits daia.
+  CREATE ,
+  DOES> GET-OPCODE
+        MODE ON
+        2 ?OPERAND ! ;
+93 OP16 SUBD  0D3 OP16 ADDD
+9C OP16 CMPX  0DC OP16 LDD  0DD OP16 STD
+9E OP16 LDX   0DE OP16 LDU
+9F OP16 STX   0DF OP16 STU
+1090 OP16 SUBW 1091 OP16 CMPW
+1092 OP16 SBCD 1093 OP16 CMPD
+1094 OP16 ANDD 1095 OP16 BITD
+1096 OP16 LDW  1097 OP16 STW
+1098 OP16 EORD 1099 OP16 ADCD
+109A OP16 ORD  109B OP16 ADDW
+109C OP16 CMPY
+109E OP16 LDY  109F OP16 STY
+10DE OP16 LDS  10DF OP16 STS
+1193 OP16 CMPU 119C OP16 CMPS
+119E OP16 DIVQ 119F OP16 MULD
+
+: OP32 \ Instructions with 32-bits daia.
+  CREATE ,
+  DOES> GET-OPCODE
+        MODE ON
+        5 ?OPERAND ! ;
+10DC OP32 LDQ 10DD OP32 STQ
+
+: OP-MEMIMM \ Instructions with memory addressing and 8-bit immediate
+  CREATE ,
+  DOES> GET-OPCODE
+        MODE ON ?MEMIMM ON
+        1 ?OPERAND ! ;
+01 OP-MEMIMM OIM
+02 OP-MEMIMM AIM
+05 OP-MEMIMM EIM
+0B OP-MEMIMM TIM
+
+: OP-BIT \ Instructions for single bit in A,B,CC register and direct page.
+  CREATE ,
+  DOES> GET-OPCODE
+  6 ?OPERAND ! 0 ;
+1130 OP-BIT BAND
+1131 OP-BIT BIAND
+1132 OP-BIT BOR
+1133 OP-BIT BIOR
+1134 OP-BIT BEOR
+1135 OP-BIT BIEOR
+1136 OP-BIT LDBT
+1137 OP-BIT STBT
+
+\ Structured assembler constructs.
+: IF >R A; R> C, >MARK ;
+: THEN A; >RESOLVE ;
+: ELSE A; 20 C, >MARK SWAP >RESOLVE ;
+: BEGIN A; <MARK ;
+: UNTIL >R A; R> C, <RESOLVE ;
+: WHILE >R A; R> C, >MARK ;
+: REPEAT A; 20 C, SWAP <RESOLVE >RESOLVE ;
+: AGAIN 20 UNTIL ;
+22 CONSTANT U<= 23 CONSTANT U>
+24 CONSTANT U<  25 CONSTANT U>=
+26 CONSTANT 0=  27 CONSTANT 0<>
+28 CONSTANT VS  29 CONSTANT VC
+2A CONSTANT 0<  2B CONSTANT 0>=
+2C CONSTANT <   2D CONSTANT >=
+2E CONSTANT <=  2F CONSTANT >
+
+: ENDASM \ End assembly.
+  A; PREVIOUS ;
+FORTH DEFINITIONS
+: ASSEMBLE \ Start assembly.
+  ALSO ASSEMBLER NOINSTR ;
+
+: CODE CREATE -3 ALLOT ASSEMBLE ;
+: END-CODE [ ASSEMBLER ] ENDASM [ FORTH ] ;
+
+PREVIOUS FORTH DEFINITIONS
+
+BASE ! \ Restore the original base.

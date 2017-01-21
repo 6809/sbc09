@@ -1,0 +1,54 @@
+\ Test for the 6309 assembler
+
+CODE TEST
+  PSHSW
+  PULSW
+  PSHUW
+  PULUW
+  LDW 0 ,W
+  STW $1234 ,W
+  ADDW ,--W
+  SUBW ,W++
+  ANDD 0 ,W []
+  ORD $1234 ,W []
+  EORD ,--W []
+  CMPD ,W++ []
+  SEXW
+  TFM++ X, Y
+  TFM-- D, U
+  TFM+0 X, D
+  TFM0+ U, X
+  ADDR A, B
+  ADCR B, A
+  ORR D, W
+  ANDR W, Y
+  EORR X, U
+  CMPR E, F
+  LDQ # $1234.5678
+  LDQ $1f
+  STQ $1234
+  ADDD E,X
+  ADDD F,X
+  ADDD W,X
+  ASLD
+  RORW
+  COME
+  INCF
+  AIM $80 $12
+  OIM $40 $1234
+  EIM $20 5 ,U
+  TIM $10 0 ,W
+  LDBT A 1 0 $FE
+  BOR  B 0 1 $FE
+  STBT CC 0 7 $FE
+  BIAND A 1 4 $FE
+  MULD # $12
+  DIVD # $12
+  DIVQ $1234 []
+  LDE # 4
+  STE $34 ,X []
+  LDMD $01
+  BITMD $80
+  PULU A, B, X, S
+END-CODE
+
