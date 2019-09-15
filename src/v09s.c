@@ -649,7 +649,9 @@ void lsr()
  ea=eaddr0();
  r=*ea;
  if(r&0x01)SEC else CLC
- if(r&0x10)SEH else CLH
+ /* according to Motorola 6809 and Hitachi 6309 Programmer's Reference
+  * half-carry is not changed
+  */
  r>>=1;
  SETNZ8(r)
  *ea=r;
@@ -695,7 +697,12 @@ void asl()
  ea=eaddr0();
  a=*ea;
  r=a<<1;
- SETSTATUS(a,a,r)
+ /* according to Motorola 6809 and Hitachi 6309 Programmer's Reference
+  * half-carry is not defined, but for an arithmetic operation the
+  * flag behaves like an add operation where the operator is added to
+  * itself.
+  */
+ SETSTATUS_H(a,a,r)
  *ea=r;
 }
 

@@ -130,7 +130,7 @@ int char_input(void) {
 	}
 }
 
-int do_input( a) {
+int do_input(int a) {
 	static int c, f = EOF;
 	if (a == 0) {
 		if (f == EOF)

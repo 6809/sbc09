@@ -56,6 +56,16 @@
 #define FNLEN 30
 #define LINELEN 128
 
+
+/* forward declarations */
+
+
+void processfile(char *name);
+
+
+/* data structures */
+
+
 static int debug=0;
 
 struct oprecord{char * name;
@@ -177,6 +187,10 @@ int symcounter=0;
 
 struct symrecord symtable[NLABELS];
 
+
+/* functions und procedures */
+
+
 struct oprecord * findop(char * nm)
 /* Find operation (mnemonic) in table using binary search */
 {
@@ -225,7 +239,7 @@ FILE *listfile,*objfile;
 char listname[FNLEN+1],objname[FNLEN+1],srcname[FNLEN+1],curname[FNLEN+1];
 int lineno;
 
-outsymtable()
+void outsymtable()
 {
  int i,j=0;
  fprintf(listfile,"\nSYMBOL TABLE");
@@ -278,7 +292,7 @@ char exprcat;          /* category of expression being parsed, eg.
 
 char namebuf[MAXIDLEN+1];
 
-scanname()
+void scanname()
 {
  int i=0;
  char c;
@@ -292,7 +306,7 @@ scanname()
  srcptr--;
 }
 
-skipspace()
+void skipspace()
 {
  char c;
  do {
@@ -571,12 +585,12 @@ int scanindexreg()
  }
 }
 
-set3()
+void set3()
 {
  if(mode<3)mode=3;
 }
 
-scanspecial()
+void scanspecial()
 {
  set3();
  skipspace();
@@ -600,7 +614,7 @@ scanspecial()
  }
 }
 
-scanindexed()
+void scanindexed()
 {
  set3();
  postbyte=0;
@@ -632,7 +646,7 @@ scanindexed()
 
 #define RESTORE {srcptr=oldsrcptr;c=*srcptr;goto dodefault;}
 
-scanoperands()
+void scanoperands()
 {
  char c,d,*oldsrcptr;
  unknown=0;
@@ -739,7 +753,7 @@ int hexcount;
 unsigned char hexbuffer[16];
 unsigned int chksum;
 
-flushhex()
+void flushhex()
 {
  int i;
  if(hexcount){
@@ -753,14 +767,14 @@ flushhex()
  }
 }
 
-outhex(unsigned char x) 
+void outhex(unsigned char x) 
 {
  if(hexcount==16)flushhex();
  hexbuffer[hexcount++]=x;
  chksum+=x;
 }
 
-outbuffer()
+void outbuffer()
 {
  int i;
  for(i=0;i<codeptr;i++)
@@ -776,7 +790,7 @@ char *errormsg[]={"Error in expression",
                 "","","","","","","","","",
                 "Illegal mnemonic"
                };
-report()
+void report()
 {
  int i;
  fprintf(stderr,"File %s, line %d:%s\n",curname,lineno,srcline);
@@ -790,7 +804,7 @@ report()
  errors++;
 }
 
-outlist()
+void outlist()
 {
  int i;
  fprintf(listfile,"%04X: ",oldlc);
@@ -801,7 +815,7 @@ outlist()
  fprintf(listfile,"%s\n",srcline);
 }
 
-setlabel(struct symrecord * lp)
+void setlabel(struct symrecord * lp)
 {
  if(lp) {
   if(lp->cat!=13&&lp->cat!=6) {
@@ -814,18 +828,18 @@ setlabel(struct symrecord * lp)
  }
 }
 
-putbyte(unsigned char b)
+void putbyte(unsigned char b)
 {
  codebuf[codeptr++]=b;
 }
 
-putword(unsigned short w)
+void putword(unsigned short w)
 {
  codebuf[codeptr++]=w>>8;
  codebuf[codeptr++]=w&0x0ff;
 }
 
-doaddress() /* assemble the right addressing bytes for an instruction */
+void doaddress() /* assemble the right addressing bytes for an instruction */
 {
  int offs;
  switch(mode) {
@@ -852,17 +866,17 @@ doaddress() /* assemble the right addressing bytes for an instruction */
  }
 }
 
-onebyte(int co)
+void onebyte(int co)
 {
  putbyte(co);
 }
 
-twobyte(int co)
+void twobyte(int co)
 {
  putword(co);
 }
 
-oneimm(int co)
+void oneimm(int co)
 {
  scanoperands();
  if(mode>=3)error|=2;
@@ -870,7 +884,7 @@ oneimm(int co)
  putbyte(operand);
 }
 
-lea(int co)
+void lea(int co)
 {
  putbyte(co);
  scanoperands();
@@ -884,7 +898,7 @@ lea(int co)
  doaddress();
 }
 
-sbranch(int co)
+void sbranch(int co)
 {
  int offs;
  scanoperands();
@@ -896,7 +910,7 @@ sbranch(int co)
  putbyte(offs);
 }
 
-lbra(int co)
+void lbra(int co)
 {
  scanoperands();
  if(mode!=1&&mode!=2)error|=2;
@@ -904,7 +918,7 @@ lbra(int co)
  putword(operand-loccounter-3);
 }
 
-lbranch(int co)
+void lbranch(int co)
 {
  scanoperands();
  if(mode!=1&&mode!=2)error|=2;
@@ -912,7 +926,7 @@ lbranch(int co)
  putword(operand-loccounter-4);
 }
 
-arith(int co)
+void arith(int co)
 {
  scanoperands();
  switch(mode) {
@@ -924,7 +938,7 @@ arith(int co)
  doaddress();
 }
 
-darith(int co)
+void darith(int co)
 {
  scanoperands();
  switch(mode) {
@@ -936,7 +950,7 @@ darith(int co)
  doaddress();
 }
 
-d2arith(int co)
+void d2arith(int co)
 {
  scanoperands();
  switch(mode) {
@@ -948,7 +962,7 @@ d2arith(int co)
  doaddress();
 }
 
-oneaddr(int co)
+void oneaddr(int co)
 {
  scanoperands();
  switch(mode) {
@@ -960,7 +974,7 @@ oneaddr(int co)
  doaddress();
 }
 
-tfrexg(int co)
+void tfrexg(int co)
 {
  struct regrecord * p;
  putbyte(co);
@@ -977,7 +991,7 @@ tfrexg(int co)
  putbyte(postbyte);
 }
 
-pshpul(int co)
+void pshpul(int co)
 {
  struct regrecord *p;
  putbyte(co);
@@ -993,7 +1007,7 @@ pshpul(int co)
  putbyte(postbyte);
 }
 
-pseudoop(int co,struct symrecord * lp)
+void pseudoop(int co,struct symrecord * lp)
 {
  int i;
  char c;
@@ -1114,7 +1128,7 @@ pseudoop(int co,struct symrecord * lp)
 }
 
 
-processline()
+void processline()
 {
  struct symrecord * lp;
  struct oprecord * op;
@@ -1170,7 +1184,7 @@ processline()
  loccounter+=codeptr;
 }
 
-suppressline()
+void suppressline()
 {
  struct oprecord * op;
  srcptr=srcline;
@@ -1193,14 +1207,14 @@ suppressline()
  if(pass==2&&listing)outlist();
 }
 
-usage(char*nm)
+void usage(char*nm)
 {
   fprintf(stderr,"Usage: %s [-o objname] [-l listname] [-s srecord-file] srcname\n",nm);
   exit(2);
 }
 
 
-getoptions(int c,char*v[])
+void getoptions(int c,char*v[])
 {
  int i=0;
  if(c==1)usage(v[0]);
@@ -1235,7 +1249,7 @@ getoptions(int c,char*v[])
  listing=listname[0]!=0;
 }
 
-expandline()
+void expandline()
 {
  int i=0,j=0,k,j1;
  for(i=0;i<128&&j<128;i++)
@@ -1252,7 +1266,7 @@ expandline()
 }
 
 
-processfile(char *name)
+void processfile(char *name)
 {
  char oldname[FNLEN+1];
  int oldno;
@@ -1281,7 +1295,7 @@ processfile(char *name)
  strcpy(curname,oldname);
 }
 
-main(int argc,char *argv[])
+void main(int argc,char *argv[])
 {
  char c;
  getoptions(argc,argv);

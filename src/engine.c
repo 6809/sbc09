@@ -25,6 +25,16 @@
    ACIA emulation at port $E000
 
    Note: BIG_ENDIAN option is no longer needed.
+
+   Implementation notes:
+     half-carry: 
+       According to Motorola 6809 and Hitachi 6309 Programmer's Reference
+       half-carry is not defined for ASL, but as an arithmetic operation the
+       flag behaves like an add operation where the operator is added to itself.
+
+       According to Motorola 6809 and Hitachi 6309 Programmer's Reference
+       LSR does not influence half-carry.
+
 */
 
 #include <stdio.h>
@@ -82,7 +92,10 @@ static int tracetrick=0;
 #define SETNZ8(b) {if(b)CLZ else SEZ if(b&0x80)SEN else CLN}
 #define SETNZ16(b) {if(b)CLZ else SEZ if(b&0x8000)SEN else CLN}
 
-#define SETSTATUS(a,b,res) if((a^b^res)&0x10) SEH else CLH \
+#define SETSTATUS(a,b,res) if((a^b^res^(res>>1))&0x80)SEV else CLV \
+                           if(res&0x100)SEC else CLC SETNZ8((Byte)res)
+
+#define SETSTATUSH(a,b,res) if((a^b^res)&0x10) SEH else CLH \
                            if((a^b^res^(res>>1))&0x80)SEV else CLV \
                            if(res&0x100)SEC else CLC SETNZ8((Byte)res)
 
@@ -479,7 +492,7 @@ void interpr(void)
    case 0x03: /*COM direct*/ DIRECT  tb=~mem[eaddr];SETNZ8(tb);SEC CLV
                              SETBYTE(eaddr,tb)break;
    case 0x04: /*LSR direct*/ DIRECT tb=mem[eaddr];if(tb&0x01)SEC else CLC
-                             if(tb&0x10)SEH else CLH tb>>=1;SETNZ8(tb)
+                             tb>>=1;SETNZ8(tb)
                              SETBYTE(eaddr,tb)break;
    case 0x05: break;/* ILLEGAL*/
    case 0x06: /*ROR direct*/ DIRECT tb=(iccreg&0x01)<<7;
@@ -492,7 +505,7 @@ void interpr(void)
                              if(tb&0x40)tb|=0x80;SETBYTE(eaddr,tb)SETNZ8(tb)
                              break;
    case 0x08: /*ASL direct*/ DIRECT tw=mem[eaddr]<<1;
-                             SETSTATUS(mem[eaddr],mem[eaddr],tw)
+                             SETSTATUSH(mem[eaddr],mem[eaddr],tw)
                              SETBYTE(eaddr,tw)break;
    case 0x09: /*ROL direct*/ DIRECT tb=mem[eaddr];tw=iccreg&0x01;
                              if(tb&0x80)SEC else CLC
@@ -655,7 +668,7 @@ void interpr(void)
    case 0x43: /*COMA*/   tb=~iareg;SETNZ8(tb);SEC CLV
                              iareg=tb;break;
    case 0x44: /*LSRA*/  tb=iareg;if(tb&0x01)SEC else CLC
-                             if(tb&0x10)SEH else CLH tb>>=1;SETNZ8(tb)
+                             tb>>=1;SETNZ8(tb)
                              iareg=tb;break;
    case 0x45: break;/* ILLEGAL*/
    case 0x46: /*RORA*/  tb=(iccreg&0x01)<<7;
@@ -667,7 +680,7 @@ void interpr(void)
                              if(tb&0x40)tb|=0x80;iareg=tb;SETNZ8(tb)
                              break;
    case 0x48: /*ASLA*/  tw=iareg<<1;
-                             SETSTATUS(iareg,iareg,tw)
+                             SETSTATUSH(iareg,iareg,tw)
                              iareg=tw;break;
    case 0x49: /*ROLA*/  tb=iareg;tw=iccreg&0x01;
                              if(tb&0x80)SEC else CLC
@@ -688,7 +701,7 @@ void interpr(void)
    case 0x53: /*COMB*/   tb=~ibreg;SETNZ8(tb);SEC CLV
                              ibreg=tb;break;
    case 0x54: /*LSRB*/  tb=ibreg;if(tb&0x01)SEC else CLC
-                             if(tb&0x10)SEH else CLH tb>>=1;SETNZ8(tb)
+                             tb>>=1;SETNZ8(tb)
                              ibreg=tb;break;
    case 0x55: break;/* ILLEGAL*/
    case 0x56: /*RORB*/  tb=(iccreg&0x01)<<7;
@@ -696,11 +709,11 @@ void interpr(void)
                              ibreg=(ibreg>>1)+tb;SETNZ8(ibreg)
                        	     break;
    case 0x57: /*ASRB*/  tb=ibreg;if(tb&0x01)SEC else CLC
-                             if(tb&0x10)SEH else CLH tb>>=1;
+                             tb>>=1;
                              if(tb&0x40)tb|=0x80;ibreg=tb;SETNZ8(tb)
                              break;
    case 0x58: /*ASLB*/  tw=ibreg<<1;
-                             SETSTATUS(ibreg,ibreg,tw)
+                             SETSTATUSH(ibreg,ibreg,tw)
                              ibreg=tw;break;
    case 0x59: /*ROLB*/  tb=ibreg;tw=iccreg&0x01;
                              if(tb&0x80)SEC else CLC
@@ -721,7 +734,7 @@ void interpr(void)
    case 0x63: /*COM indexed*/   tb=~mem[eaddr];SETNZ8(tb);SEC CLV
                              SETBYTE(eaddr,tb)break;
    case 0x64: /*LSR indexed*/  tb=mem[eaddr];if(tb&0x01)SEC else CLC
-                             if(tb&0x10)SEH else CLH tb>>=1;SETNZ8(tb)
+                             tb>>=1;SETNZ8(tb)
                              SETBYTE(eaddr,tb)break;
    case 0x65: break;/* ILLEGAL*/
    case 0x66: /*ROR indexed*/  tb=(iccreg&0x01)<<7;
@@ -734,7 +747,7 @@ void interpr(void)
                              if(tb&0x40)tb|=0x80;SETBYTE(eaddr,tb)SETNZ8(tb)
                              break;
    case 0x68: /*ASL indexed*/  tw=mem[eaddr]<<1;
-                             SETSTATUS(mem[eaddr],mem[eaddr],tw)
+                             SETSTATUSH(mem[eaddr],mem[eaddr],tw)
                              SETBYTE(eaddr,tw)break;
    case 0x69: /*ROL indexed*/  tb=mem[eaddr];tw=iccreg&0x01;
                              if(tb&0x80)SEC else CLC
@@ -755,7 +768,7 @@ void interpr(void)
    case 0x73: /*COM ext*/ EXTENDED  tb=~mem[eaddr];SETNZ8(tb);SEC CLV
                             SETBYTE(eaddr,tb)break;
    case 0x74: /*LSR ext*/ EXTENDED tb=mem[eaddr];if(tb&0x01)SEC else CLC
-                             if(tb&0x10)SEH else CLH tb>>=1;SETNZ8(tb)
+                             tb>>=1;SETNZ8(tb)
                              SETBYTE(eaddr,tb)break;
    case 0x75: break;/* ILLEGAL*/
    case 0x76: /*ROR ext*/ EXTENDED tb=(iccreg&0x01)<<7;
@@ -768,7 +781,7 @@ void interpr(void)
                              if(tb&0x40)tb|=0x80;SETBYTE(eaddr,tb)SETNZ8(tb)
                              break;
    case 0x78: /*ASL ext*/ EXTENDED tw=mem[eaddr]<<1;
-                             SETSTATUS(mem[eaddr],mem[eaddr],tw)
+                             SETSTATUSH(mem[eaddr],mem[eaddr],tw)
                              SETBYTE(eaddr,tw)break;
    case 0x79: /*ROL ext*/ EXTENDED tb=mem[eaddr];tw=iccreg&0x01;
                              if(tb&0x80)SEC else CLC
@@ -809,7 +822,7 @@ void interpr(void)
    case 0x88: /*EORA immediate*/ IMM8 iareg=iareg^mem[eaddr];SETNZ8(iareg)
    				 CLV break;
    case 0x89: /*ADCA immediate*/ IMM8 tw=iareg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(iareg,mem[eaddr],tw)
+                                 SETSTATUSH(iareg,mem[eaddr],tw)
                                  iareg=tw;break;
    case 0x8A: /*ORA immediate*/  IMM8 iareg=iareg|mem[eaddr];SETNZ8(iareg)
    				 CLV break;
@@ -858,7 +871,7 @@ void interpr(void)
    case 0x98: /*EORA direct*/ DIRECT iareg=iareg^mem[eaddr];SETNZ8(iareg)
    				 CLV break;
    case 0x99: /*ADCA direct*/ DIRECT tw=iareg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(iareg,mem[eaddr],tw)
+                                 SETSTATUSH(iareg,mem[eaddr],tw)
                                  iareg=tw;break;
    case 0x9A: /*ORA direct*/  DIRECT iareg=iareg|mem[eaddr];SETNZ8(iareg)
    				 CLV break;
@@ -907,7 +920,7 @@ void interpr(void)
    case 0xA8: /*EORA indexed*/  iareg=iareg^mem[eaddr];SETNZ8(iareg)
    				 CLV break;
    case 0xA9: /*ADCA indexed*/  tw=iareg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(iareg,mem[eaddr],tw)
+                                 SETSTATUSH(iareg,mem[eaddr],tw)
                                  iareg=tw;break;
    case 0xAA: /*ORA indexed*/   iareg=iareg|mem[eaddr];SETNZ8(iareg)
    				 CLV break;
@@ -956,7 +969,7 @@ void interpr(void)
    case 0xB8: /*EORA ext*/ EXTENDED iareg=iareg^mem[eaddr];SETNZ8(iareg)
    				 CLV break;
    case 0xB9: /*ADCA ext*/ EXTENDED tw=iareg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(iareg,mem[eaddr],tw)
+                                 SETSTATUSH(iareg,mem[eaddr],tw)
                                  iareg=tw;break;
    case 0xBA: /*ORA ext*/  EXTENDED iareg=iareg|mem[eaddr];SETNZ8(iareg)
    				 CLV break;
@@ -1005,7 +1018,7 @@ void interpr(void)
    case 0xC8: /*EORB immediate*/ IMM8 ibreg=ibreg^mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
    case 0xC9: /*ADCB immediate*/ IMM8 tw=ibreg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(ibreg,mem[eaddr],tw)
+                                 SETSTATUSH(ibreg,mem[eaddr],tw)
                                  ibreg=tw;break;
    case 0xCA: /*ORB immediate*/  IMM8 ibreg=ibreg|mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
@@ -1050,7 +1063,7 @@ void interpr(void)
    case 0xD8: /*EORB direct*/ DIRECT ibreg=ibreg^mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
    case 0xD9: /*ADCB direct*/ DIRECT tw=ibreg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(ibreg,mem[eaddr],tw)
+                                 SETSTATUSH(ibreg,mem[eaddr],tw)
                                  ibreg=tw;break;
    case 0xDA: /*ORB direct*/  DIRECT ibreg=ibreg|mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
@@ -1095,7 +1108,7 @@ void interpr(void)
    case 0xE8: /*EORB indexed*/  ibreg=ibreg^mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
    case 0xE9: /*ADCB indexed*/  tw=ibreg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(ibreg,mem[eaddr],tw)
+                                 SETSTATUSH(ibreg,mem[eaddr],tw)
                                  ibreg=tw;break;
    case 0xEA: /*ORB indexed*/   ibreg=ibreg|mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
@@ -1140,7 +1153,7 @@ void interpr(void)
    case 0xF8: /*EORB ext*/ EXTENDED ibreg=ibreg^mem[eaddr];SETNZ8(ibreg)
    				 CLV break;
    case 0xF9: /*ADCB ext*/ EXTENDED tw=ibreg+mem[eaddr]+(iccreg&0x01);
-                                 SETSTATUS(ibreg,mem[eaddr],tw)
+                                 SETSTATUSH(ibreg,mem[eaddr],tw)
                                  ibreg=tw;break;
    case 0xFA: /*ORB ext*/  EXTENDED ibreg=ibreg|mem[eaddr];SETNZ8(ibreg)
    				 CLV break;

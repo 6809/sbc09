@@ -29,6 +29,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define engine extern
 
@@ -49,7 +50,7 @@ void do_trace(void)
                    xreg,yreg,ureg,sreg,*areg,*breg,ccreg);
 } 
  
-read_image()
+void read_image()
 {
  FILE *image;
  if((image=fopen("v09.rom","rb"))==NULL) 
@@ -72,7 +73,7 @@ void usage(void)
 
 #define CHECKARG if(i==argc)usage();else i++;
 
-main(int argc,char *argv[])
+void main(int argc,char *argv[])
 {
  Word loadaddr=0x100;
  char *imagename=0;
