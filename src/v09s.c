@@ -55,6 +55,7 @@
                 Fixed: H flag only changed for add and adc.
 	2019-09-16 JK
 		Fixed: TFR/EXG 8 to 16 bit (especially CC/DP handling)
+		Fixed: CLV for 16-bit ST/LD
 
 */
 
@@ -1351,6 +1352,7 @@ void ldd()
  ea=eaddr16();
  w=GETWORD(ea);
  SETNZ16(w)
+ CLV
  *dreg=w;
 }
 
@@ -1362,6 +1364,7 @@ void ldx()
  ea=eaddr16();
  w=GETWORD(ea);
  SETNZ16(w)
+ CLV
  if (iflag==0) xreg=w; else yreg=w;
 }
 
@@ -1373,6 +1376,7 @@ void ldu()
  ea=eaddr16();
  w=GETWORD(ea);
  SETNZ16(w)
+ CLV
  if (iflag==0) ureg=w; else sreg=w;
 }
 
@@ -1383,6 +1387,7 @@ void std()
  ea=eaddr16();
  w=*dreg;
  SETNZ16(w)
+ CLV
  SETWORD(ea,w)
 }
 
@@ -1394,6 +1399,7 @@ void stx()
  ea=eaddr16();
  if (iflag==0) w=xreg; else w=yreg;
  SETNZ16(w)
+ CLV
  SETWORD(ea,w)
 }
 
@@ -1405,6 +1411,7 @@ void stu()
  ea=eaddr16();
  if (iflag==0) w=ureg; else w=sreg;
  SETNZ16(w)
+ CLV
  SETWORD(ea,w)
 }
 
