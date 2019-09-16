@@ -53,6 +53,8 @@
                 Fixed: wrong cmpu cycles
         2017-10-20 JK
                 Fixed: H flag only changed for add and adc.
+	2019-09-16 JK
+		Fixed: TFR/EXG 8 to 16 bit (especially CC/DP handling)
 
 */
 
@@ -988,6 +990,9 @@ void tfr()
  // source in higher nibble (highest bit set means 8 bit reg.)
  if(b&0x80) {
   v=*byteregs[(b&0x70)>>4] | 0xff00;
+  if ((b &0x70) == 0x20 || (b &0x70) == 0x30) { /* source is CC or DP */
+   v = (v & 0xff) << 8 | (v & 0xff); /* high byte is the same as the low byte */
+  }
  } else {
   v=*wordregs[(b&0x70)>>4];
  }
@@ -1013,6 +1018,9 @@ void exg()
  da_reg(b);
  if(b&0x80) {
   f=*byteregs[(b&0x70)>>4] | 0xff00;
+  if ((b &0x70) == 0x20 || (b &0x70) == 0x30) { /* first operand is CC or DP */
+   f = (f & 0xff) << 8 | (f & 0xff); /* high byte is the same as the low byte */
+  }
  } else {
   f=*wordregs[(b>>4)&0x07];
  }
