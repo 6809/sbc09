@@ -154,11 +154,66 @@ E F H I N Z V C  Flag
 
 # differences from real 6809:
 
-ldd #$0fc9
-addb #$40
-adca #$00
+        ldd #$0fc9
+        addb #$40               ; $C9+$40 -> $09 -> C=1
+        adca #$00               ; $0F+C -> $10 -> H=1
 
-H is set on VCC but not on real 6809, sim6809 does what?
+Should Set the half-carry!
+
+For this example the half-carry is set on a real 6809, also correctly
+emulated on the VCC. v09s does the same.
+
+According to "Motorola 6809 and Hitachi 6309 Programmer's Reference"
+the half-carry is only properly set for ADD and ADC (on 8-bit accumulators).
+For ASR, ASL (= LSL), CMP, SBC, SUB this condition flag is undefined.
+The v09s simulator calculates the half-carry also for ASR and ASL.
+
+ASL does the following:
+ * sets H if bit 4 was set.
+ * clears H if bit was not set.
+
+ASR (=LSR) does the following:
+ * xxx1 xxxx  --- (LSR|ASR) --->  xxxx 1xxx  => H=1
+ * xxx0 xxxx  --- (LSR|ASR) --->  xxxx 0xxx  => H=0
+
+
+But note: LSR never touches the half-carry!
+
+
+## TFR/EXG with unaligned register sizes
+
+See http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=8&t=5512
+        Points to the 6309 behavior which is not compatible to 6809!
+
+tfr x,b         ; 6809,6309: b low byte of x, a unchanged
+tfr x,a         ; 6809, a low byte of x, b unchanged 
+		; on a 6309: a high(!) byte of x, b unchanged
+
+Might be used to get the low byte out of an index register without harm
+the A register:
+
+instead of
+        pushs a
+        tfr x,d
+        andb #$1f
+it could be used
+        tfr x,b
+        andb #$1f       ; a left untouched!
+
+REF: http://www.6809.org.uk/dragon/illegal-opcodes.shtml
+REF: http://archive.worldofdragon.org/phpBB3/viewtopic.php?f=8&t=4886
+
+tfr a,x         ; low byte of x has value of a, high byte is $FF
+tfr b,x         ; low byte of x has value of b, high byte is $FF
+
+exg a,x         ; low byte of x has value of a, high byte is $FF
+exg b,x         ; low byte of x has value of b, high byte is $FF
+
+According to Motorola 6809 and Hitachi 6309 Programmer's Reference
+
+Except for the case where the first operand is 8 bit and register CC or DP:
+In this case the 16-bit register has the value of the 8-bit register in
+high and low byte!
 
           
 ### special behavior
