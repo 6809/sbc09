@@ -51,8 +51,6 @@
                         http://www.6809.org.uk/dragon/illegal-opcodes.shtml
         2016-10-06 JK
                 Fixed: wrong cmpu cycles
-        2016-10-31 JK
-                Changed: TFR X,A transfers the high byte of X
         2017-10-20 JK
                 Fixed: H flag only changed for add and adc.
 
@@ -986,19 +984,16 @@ void tfr()
  IMMBYTE(b)
  da_reg(b);
  Word v;
+ // see http://www.6809.org.uk/dragon/illegal-opcodes.shtml
  // source in higher nibble (highest bit set means 8 bit reg.)
  if(b&0x80) {
-  v=*byteregs[(b&0x70)>>4] | (b&0x08 ? 0 : 0xff00);
+  v=*byteregs[(b&0x70)>>4] | 0xff00;
  } else {
   v=*wordregs[(b&0x70)>>4];
  }
  // dest in lower nibble (highest bit set means 8 bit reg.)
  if(b&0x8) {
-  *byteregs[b&0x07]= ( (!(b&0x80) && (b&0x07)==0)
-                     ? (v >> 8)         // register a
-                     : v                // other than a
-                     )
-                     &0xff;
+  *byteregs[b&0x07]=v &0xff;
   fillreg=0xff;  // keep fillvalue
  } else {
   *wordregs[b&0x07]=v;
@@ -1012,6 +1007,8 @@ void exg()
  Word f;
  Word t;
  da_inst("exg",NULL,8);
+ // see http://www.6809.org.uk/dragon/illegal-opcodes.shtml
+ // 8 <-> 16, high byte is filled with $ff!
  IMMBYTE(b)
  da_reg(b);
  if(b&0x80) {

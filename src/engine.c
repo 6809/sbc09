@@ -108,37 +108,51 @@ static int tracetrick=0;
                      else{IMMWORD(tw) if(f)ipcreg+=tw;}
 #define NXORV  ((iccreg&0x08)^((iccreg&0x02)<<2))
 
-/* MAcros for setting/getting registers in TFR/EXG instructions */
+/* Macros for setting/getting registers in TFR/EXG instructions */
+/* see http://www.6809.org.uk/dragon/illegal-opcodes.shtml */
+/* 8 <-> 16, high byte is filled with $ff! */
 #define GETREG(val,reg) switch(reg) {\
                          case 0: val=GETDREG;break;\
                          case 1: val=ixreg;break;\
                          case 2: val=iyreg;break;\
-                    	 case 3: val=iureg;break;\
-                    	 case 4: val=isreg;break;\
-                    	 case 5: val=ipcreg;break;\
-                    	 case 8: val=iareg;break;\
-                    	 case 9: val=ibreg;break;\
-                    	 case 10: val=iccreg;break;\
-                    	 case 11: val=idpreg;break;}
+                         case 3: val=iureg;break;\
+                         case 4: val=isreg;break;\
+                         case 5: val=ipcreg;break;\
+                         case 6: val=0xffff;break;\
+                         case 7: val=0xffff;break;\
+                         case 8: val=iareg|0xff00;break;\
+                         case 9: val=ibreg|0xff00;break;\
+                         case 10: val=iccreg|0xff00;break;\
+                         case 11: val=idpreg|0xff00;break;\
+                         case 12: val=0xffff;break;\
+                         case 13: val=0xffff;break;\
+                         case 14: val=0xffff;break;\
+                         case 15: val=0xffff;break;}
 
 #define SETREG(val,reg) switch(reg) {\
-			 case 0: SETDREG(val) break;\
-			 case 1: ixreg=val;break;\
-			 case 2: iyreg=val;break;\
-			 case 3: iureg=val;break;\
-			 case 4: isreg=val;break;\
-			 case 5: ipcreg=val;break;\
-			 case 8: iareg=val;break;\
-			 case 9: ibreg=val;break;\
-			 case 10: iccreg=val;break;\
-			 case 11: idpreg=val;break;}
+                         case 0: SETDREG(val) break;\
+                         case 1: ixreg=val;break;\
+                         case 2: iyreg=val;break;\
+                         case 3: iureg=val;break;\
+                         case 4: isreg=val;break;\
+                         case 5: ipcreg=val;break;\
+                         case 6: val=0xffff;break;\
+                         case 7: val=0xffff;break;\
+                         case 8: iareg=val&0xff;break;\
+                         case 9: ibreg=val&0xff;break;\
+                         case 10: iccreg=val&0xff;break;\
+                         case 11: idpreg=val&0xff;break;\
+                         case 12: val=0xffff;break;\
+                         case 13: val=0xffff;break;\
+                         case 14: val=0xffff;break;\
+                         case 15: val=0xffff;break;}
 
 /* Macros for load and store of accumulators. Can be modified to check
    for port addresses */
 #define LOADAC(reg) if((eaddr&0xff00)!=IOPAGE)reg=mem[eaddr];else\
            reg=do_input(eaddr&0xff);
 #define STOREAC(reg) if((eaddr&0xff00)!=IOPAGE)SETBYTE(eaddr,reg)else\
-	   do_output(eaddr&0xff,reg);
+           do_output(eaddr&0xff,reg);
 
 #define LOADREGS ixreg=xreg;iyreg=yreg;\
  iureg=ureg;isreg=sreg;\
