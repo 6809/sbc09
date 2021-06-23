@@ -42,7 +42,7 @@ LABEL DOVAR
 
 LABEL DOCOL
  STU ,--Y \ Save IP on return stack.
- LDU ,S++ \ Pop IP from stack where it is left by JSR DOCOL.
+ PULS U \ Pop IP from stack where it is left by JSR DOCOL.
  NEXT
 
 LABEL DODEFER
@@ -51,8 +51,8 @@ LABEL DODEFER
 ENDASM
 
 CODE LIT ( --- n)
- LDD ,U++ \ Get literal from instruction stream.
- STD ,--S
+ PULU D \ Get literal from instruction stream.
+ PSHS D
  NEXT
 END-CODE
 
@@ -84,18 +84,18 @@ CODE UNNEST
 END-CODE
 
 CODE (DO) ( l s ---)
- LDD  ,S++
+ PULS D
 LABEL DO1
  SUBD 0 ,S
  EORA # $80 \ Now START-LIMIT-$8000 Initial value for counter.
- LDX ,S++
+ PULS X
  STX ,--Y   \ Push limit value.
  STD ,--Y
  NEXT
 END-CODE
 
 CODE (?DO) ( l s ---)
- LDD ,S++
+ PULS D
  CMPD 0 ,S
  0<> IF
    LEAU 2 ,U \ Skip branch address.
@@ -143,13 +143,13 @@ CODE I ( --- n)
  LDD 0 ,Y
  EORA # $80
  ADDD 2 ,Y
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
 CODE I' ( ---n)
  LDD 2 ,Y
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
@@ -157,7 +157,7 @@ CODE J ( ---n)
  LDD 4 ,Y
  EORA # $80
  ADDD 6 ,Y
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
@@ -168,19 +168,19 @@ END-CODE
 
 CODE R@ ( --- n)
  LDD 0 ,Y
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
 CODE >R ( n ---)
- LDD ,S++
+ PULS D
  STD ,--Y
  NEXT
 END-CODE
 
 CODE R> ( --- n)
  LDD ,Y++
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
@@ -196,12 +196,12 @@ END-CODE
 
 CODE SP@ ( --- addr)
  TFR S, D
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
 CODE SP! ( addr ---)
- LDD ,S++
+ PULS D
  TFR D, S
  NEXT
 END-CODE
@@ -238,38 +238,34 @@ CODE UM* ( u1 u2 --- ud)
 END-CODE
 
 CODE UM/MOD  ( ud u --- rem quot)
- LEAS -1 ,S \ Create room for iteration counter.
- LDA # 16
- STA 0 ,S
+ LDX # 16 \ iteration counter.
+ LDD 2 ,S
  BEGIN
-  ASL 6 ,S
-  ROL 5 ,S
+  ASL 5 ,S
   ROL 4 ,S
-  ROL 3 ,S
-  LDD 3 ,S
+  ROLB
+  ROLA
   U< IF     \ Account for extra bit shifted out, perform subtraction anyway.
-   SUBD 1 ,S
-   STD 3 ,S
-   INC 6 ,S
+   SUBD 0 ,S
+   INC 5 ,S
   ELSE
-   SUBD 1 ,S  \ Perform trial subtraction.
+   CMPD 0 ,S  \ Perform trial subtraction.
    U>= IF
-    STD 3 ,S
-    INC 6 ,S  \ Add 1-bit to quotient.
+    SUBD 0 ,S
+    INC 5 ,S  \ Add 1-bit to quotient.
    THEN
   THEN
-  DEC 0 ,S
+  LEAX -1 ,X
   0= UNTIL
-  LEAS 3 ,S
-  LDD 2 ,S
-  LDX 0 ,S
-  STX 2 ,S
-  STD 0 ,S
+  LEAS 2 ,S
+  LDX 2 ,S  \ rem and quot on proper positions
+  STX 0 ,S
+  STD 2 ,S  \ D contains rem
   NEXT
 END-CODE
 
 CODE + ( n1 n2 ---n3)
- LDD  ,S++
+ PULS D
  ADDD 0 ,S
  STD 0 ,S
  NEXT
@@ -291,25 +287,25 @@ CODE NEGATE ( n1 --- n2)
 END-CODE
 
 CODE AND ( n1 n2 ---n3)
- LDD 2 ,S
- ANDA ,S+
- ANDB ,S+
+ PULS D
+ ANDA ,S
+ ANDB 1 ,S
  STD 0 ,S
  NEXT
 END-CODE
 
 CODE OR ( n1 n2 ---n3)
- LDD 2 ,S
- ORA ,S+
- ORB ,S+
+ PULS D
+ ORA ,S
+ ORB 1 ,S
  STD 0 ,S
  NEXT
 END-CODE
 
 CODE XOR ( n1 n2 ---n3)
- LDD 2 ,S
- EORA ,S+
- EORB ,S+
+ PULS D
+ EORA ,S
+ EORB 1 ,S
  STD 0 ,S
  NEXT
 END-CODE
@@ -414,7 +410,7 @@ END-CODE
 
 CODE DUP   ( n --- n n )
  LDD 0 ,S
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
@@ -428,7 +424,7 @@ END-CODE
 
 CODE OVER  ( n1 n2 --- n1 n2 n1)
  LDD 2 ,S
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
@@ -485,9 +481,11 @@ END-CODE
 
 CODE PICK ( n1 --- n2)
  LDD 0 ,S
- ADDD ,S++
- LDD D,S
- STD ,--S
+ ADDD # 1 \ Correct index
+ ASLB     \ Cell* (assert: cellL=2!)
+ ROLA
+ LDX D,S  \ Pick value
+ STX 0 ,S \ Replace top
  NEXT
 END-CODE
 
@@ -555,7 +553,7 @@ CODE 2@ ( addr --- d)
  LDD 0 ,X
  LDX 2 ,X
  STX 0 ,S
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
@@ -776,12 +774,12 @@ END-CODE
 CODE KEY ( --- c)
  JSR 0
  CLRA
- STD ,--S
+ PSHS D
  NEXT
 END-CODE
 
 CODE EMIT ( c ---)
- LDD ,S++
+ PULS D
  JSR 3
  NEXT
 END-CODE
