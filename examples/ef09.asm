@@ -109,7 +109,7 @@ ORIG		lds #SPP			;Init stack pointer.
 ; MUST BE IN SAME ORDER AS USER VARIABLES.
 
 
-UZERO		RMB     8			;reserved space in user area
+UZERO		FCB     0,0,0,0,0,0,0,0		;reserved space in user area
 		FDB	SPP			;SP0
 		FDB	RPP			;RP0
 		FDB	QRX			;'?KEY
@@ -130,7 +130,7 @@ UZERO		RMB     8			;reserved space in user area
 		FDB	0			;HLD
 		FDB	0			;HANDLER
 		FDB	0			;CONTEXT pointer
-		RMB     VOCSS*2			;vocabulary stack
+		FDB     0,0,0,0,0,0,0,0		;vocabulary stack (VOCSS*2 bytes)
 		FDB	0			;CURRENT pointer
 		FDB	0			;vocabulary link pointer
 		FDB	CTOP			;CP
