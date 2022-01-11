@@ -1390,7 +1390,7 @@ xerror		jsr rstvecs	;Restore I/O vectors
 	
 xerrhand	lds savesp
 		jmp cmdline
-	
+
 * This is the code for the X command, various XMODEM related commands.
 * Syntax: XSaddr,len XLaddr,len XX XOcrlf,filler, XSSaddr,len
 xmodem		ldx #linebuf+1
@@ -2832,7 +2832,6 @@ asmerr		pshs x
 		lds savesp
 		jmp cmdline
 
-	
 * Find register for TFR and PSH instruction
 findreg		ldb #12
 		pshs y,b
